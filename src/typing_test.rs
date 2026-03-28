@@ -1,23 +1,31 @@
 use std::time::Instant;
 
+/// Represents a single letter of a word
 #[derive(Debug, Clone)]
 pub struct Letter {
-    pub letter: char,
-    pub char_id: usize,
-    pub word_id: usize,
+    letter: char,
+    char_id: usize,
+    word_id: usize,
 }
 
+/// Represent a single word of the text to type
 #[derive(Debug, Clone)]
 pub struct Word {
-    pub letters: Vec<Letter>,
-    pub is_error: bool,
-    pub id: usize,
-    pub word: String,
-    pub last_typed: usize,
+    id: usize,
+    letters: Vec<Letter>,
+
+    /// Whether the word has been typed wrong
+    is_error: bool,
+
+    /// The underlying word. Kept so we can easily render the word
+    word: String,
+
+    /// Which letter the user last typed
+    last_typed_letter_index: usize,
 }
 
 impl Word {
-    pub fn from_str(text: &str, id: usize) -> Word {
+    pub fn new(text: &str, id: usize) -> Word {
         Word {
             letters: text
                 .chars()
@@ -31,19 +39,51 @@ impl Word {
             is_error: false,
             id,
             word: text.to_string(),
-            last_typed: 0,
+            last_typed_letter_index: 0,
         }
     }
 }
 
+/// Represents a single typing test
 pub struct TypingTest {
-    pub words: Vec<Word>,
-    pub word_index: usize,
-    pub letter_index: usize,
-    pub time_started: Instant,
-    pub started: bool,
-    pub wrongs: usize,
-    pub char_typed: i32,
+    /// All the words of the text to type
+    words: Vec<Word>,
+
+    /// The current word the user is at
+    word_index: usize,
+
+    /// The current letter in the current word
+    letter_index: usize,
+
+    /// When the test has started
+    time_started: Instant,
+
+    /// Whether the test has started
+    started: bool,
+
+    /// How many wrong words
+    wrongs: usize,
+
+    /// How many characters typed in total (includes spaces)
+    n_letter_typed: i32,
 }
 
-impl TypingTest {}
+impl TypingTest {
+    pub fn new(text: &str) -> Self {
+        let words: Vec<Word> = text
+            .split(" ")
+            .enumerate()
+            .map(|(id, word)| Word::new(word, id))
+            .collect();
+
+        TypingTest {
+            word_index: 0,
+            letter_index: 0,
+            time_started: Instant::now(),
+            started: false,
+            words,
+            wrongs: 0,
+            n_letter_typed: 0,
+        }
+    }
+}
