@@ -47,6 +47,10 @@ impl Word {
 /// Represents a single typing test
 pub struct TypingTest {
     /// All the words of the text to type
+    ///
+    ///  0        1        2       3     4      5       6        7
+    /// [[hello], [world], [this], [is], [the], [best], [thing], [ever]]
+    ///   01234    01234    0123    01    012    0123    01234    0123
     words: Vec<Word>,
 
     /// The current word the user is at
@@ -85,5 +89,10 @@ impl TypingTest {
             wrongs: 0,
             n_letter_typed: 0,
         }
+    }
+
+    /// Processes the typed character. Returns whether the test is done.
+    pub fn on_type(&self, c: char) -> bool {
+        false
     }
 }
