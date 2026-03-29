@@ -250,11 +250,11 @@ impl TypingTest {
         }
 
         let now = Instant::now();
-        let ellapsed = now - self.time_started;
+        let elapsed = now - self.time_started;
 
         let final_typed_words = self.total_letters_typed() as f32 / 5.0 - self.n_wrongs() as f32;
 
-        final_typed_words / ellapsed.as_secs_f32()
+        final_typed_words / elapsed.as_secs_f32()
     }
 
     /// Handle the space character
