@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -52,12 +53,6 @@ pub struct Word {
 }
 
 impl Word {
-    pub fn len(&self) -> usize {
-        self.letters.len()
-    }
-}
-
-impl Word {
     pub fn new(text: &str, id: usize) -> Word {
         Word {
             letters: text
@@ -81,6 +76,23 @@ impl Word {
     /// Push a letter to the word
     pub fn push(&mut self, letter: Letter) {
         self.letters.push(letter)
+    }
+
+    pub fn len(&self) -> usize {
+        self.letters.len()
+    }
+}
+
+impl Display for Word {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.letters
+                .iter()
+                .map(|letter| letter.letter)
+                .collect::<String>()
+        )
     }
 }
 
@@ -157,10 +169,11 @@ impl TypingTest {
             let curr_letter = &mut curr_word.letters[self.letter_index];
             curr_letter.typed_letter = TypedState::Typed(c);
 
+            let is_last_word_error = curr_word.is_error();
             let is_at_last_letter_of_last_word =
                 self.word_index >= self.words.len() - 1 && self.letter_index >= word_len - 1;
 
-            if is_at_last_letter_of_last_word {
+            if is_at_last_letter_of_last_word && !is_last_word_error {
                 return true;
             }
         }
@@ -294,7 +307,8 @@ mod typing_test_test {
         let did_end = test.on_type('o');
 
         assert_eq!(did_end, false, "should not have ended");
-        assert_eq!(test.words[0].is_error(), true, "word has extra letter")
+        assert_eq!(test.words[0].is_error(), true, "word has extra letter");
+        assert_eq!(test.words[0].to_string(), "Hellowo");
     }
 
     #[test]
@@ -308,7 +322,43 @@ mod typing_test_test {
             did_end, true,
             "should have ended on the last char of the last word"
         );
-        assert_eq!(test.words[0].is_error(), false, "word has extra letter");
-        assert_eq!(test.words[1].is_error(), false, "word has extra letter");
+        assert_eq!(test.words[0].is_error(), false, "word is valid");
+        assert_eq!(test.words[1].is_error(), false, "word is valid");
+    }
+
+    #[test]
+    fn on_type_all_and_last_word_error() {
+        let mut test = TypingTest::new("Hello world!");
+
+        "Hello worlk".chars().any(|c| test.on_type(c));
+        let did_end = test.on_type('!');
+
+        assert_eq!(did_end, false, "should not end on last word if has error");
+        assert_eq!(test.words[0].is_error(), false, "word is valid");
+        assert_eq!(test.words[1].is_error(), true, "contains error");
+    }
+
+    #[test]
+    fn on_type_all_and_last_word_overflow() {
+        let mut test = TypingTest::new("Hello world!");
+
+        "Hello worlkkkk".chars().any(|c| test.on_type(c));
+        let did_end = test.on_type('!');
+
+        assert_eq!(did_end, false, "should not end on last word if has error");
+        assert_eq!(test.words[0].is_error(), false, "word is valid");
+        assert_eq!(test.words[1].is_error(), true, "contains error");
+    }
+
+    #[test]
+    fn on_type_all_and_last_word_error_but_space() {
+        let mut test = TypingTest::new("Hello world!");
+
+        "Hello worlk!".chars().any(|c| test.on_type(c));
+        let did_end = test.on_type(' ');
+
+        assert_eq!(did_end, true, "should not end on last word if has error");
+        assert_eq!(test.words[0].is_error(), false, "word is valid");
+        assert_eq!(test.words[1].is_error(), true, "contains error");
     }
 }
