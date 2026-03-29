@@ -210,6 +210,21 @@ impl TypingTest {
         self.time_started = Instant::now();
     }
 
+    /// Gets the WPM now since the starting time.
+    /// If it hasn't started, it's 0
+    pub fn wpm(&self) -> f32 {
+        if !self.started {
+            return 0.0;
+        }
+
+        let now = Instant::now();
+        let ellapsed = now - self.time_started;
+
+        let final_typed_words = self.total_letters_typed() as f32 / 5.0 - self.n_wrongs() as f32;
+
+        final_typed_words / ellapsed.as_secs_f32()
+    }
+
     /// Handle the space character
     /// Moves the cursor to the next word and reset the letter index to 0
     /// If it's the last word, mark it as error and end the test
