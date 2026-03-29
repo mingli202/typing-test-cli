@@ -178,7 +178,8 @@ impl TypingTest {
         let curr_word = &mut self.words[self.word_index];
         let word_len = curr_word.letters_len();
 
-        if self.letter_index >= word_len {
+        let is_overshoot = self.letter_index >= word_len;
+        if is_overshoot {
             curr_word.push(Letter {
                 letter: c,
                 typed_letter: TypedState::Extra,
