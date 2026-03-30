@@ -12,7 +12,7 @@ pub struct Quote {
     pub quote: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Data {
     words: Vec<String>,
     quotes: Vec<Quote>,
@@ -30,7 +30,7 @@ impl Data {
     pub fn new_offline(
         words_path: Option<String>,
         quotes_path: Option<String>,
-    ) -> Result<Self, Box<dyn Error>> {
+    ) -> color_eyre::Result<Self, Box<dyn Error>> {
         let words = serde_json::from_str::<Vec<String>>(
             &(if let Some(p) = words_path {
                 fs::read_to_string(p)?

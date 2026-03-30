@@ -6,12 +6,30 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 use ratatui::{DefaultTerminal, Frame};
 
+use self::data::Data;
+use self::typing_test::TypingTest;
+
+mod data;
 mod typing_test;
 
-#[derive(Default)]
-pub struct TypingTestState {}
+pub struct TypingTestState {
+    typing_test: TypingTest,
+}
 
-#[derive(Default)]
+impl TypingTestState {
+    pub fn new(typing_test: TypingTest) -> Self {
+        TypingTestState { typing_test }
+    }
+}
+
+impl Widget for &TypingTestState {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+    }
+}
+
 pub struct EndScreenState {}
 
 pub enum Transition {
@@ -25,12 +43,6 @@ pub enum Transition {
 pub enum State {
     TypingTestState(TypingTestState),
     EndScreenState(EndScreenState),
-}
-
-impl Default for State {
-    fn default() -> Self {
-        State::TypingTestState(TypingTestState::default())
-    }
 }
 
 impl Widget for &State {
@@ -48,18 +60,24 @@ impl State {
     }
 }
 
-#[derive(Default)]
-struct Config {}
-
-#[derive(Default)]
 struct App {
     state: State,
     history: Vec<State>,
-    config: Config,
     exit: bool,
+    data: Data,
 }
 
 impl App {
+    pub fn new(data: Data) -> Self {
+        let initial_text = data.get_random_quote().quote.clone();
+        App {
+            state: State::TypingTestState(TypingTestState::new(TypingTest::new(&initial_text))),
+            history: vec![],
+            exit: false,
+            data,
+        }
+    }
+
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
