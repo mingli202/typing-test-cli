@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::typing_test::letter::TypedState;
 
 use super::letter::Letter;
@@ -8,14 +10,14 @@ pub struct Word {
     /// Index of the word in the typing test
     id: usize,
 
-    /// Its letters
-    letters: Vec<Letter>,
-
     /// The underlying word. Kept so we can easily render the word
     word: String,
 
+    /// Its letters
+    pub(super) letters: Vec<Letter>,
+
     /// Which letter the user last typed
-    last_typed_letter_index: usize,
+    pub(super) last_typed_letter_index: usize,
 }
 
 impl Word {
@@ -64,7 +66,7 @@ impl Word {
     pub fn n_letters_typed(&self) -> usize {
         self.letters
             .iter()
-            .filter(|letter| matches!(letter.typed_state(), TypedState::Typed(_)))
+            .filter(|letter| matches!(letter.typed_state, TypedState::Typed(_)))
             .count()
     }
 
@@ -72,11 +74,19 @@ impl Word {
     pub fn to_string_typed(&self) -> String {
         self.letters
             .iter()
-            .filter_map(|letter| match letter.typed_state() {
+            .filter_map(|letter| match letter.typed_state {
                 TypedState::Typed(c) => Some(c),
                 _ => None,
             })
             .collect::<String>()
+    }
+
+    pub fn get_letter(&self, index: usize) -> Option<&Letter> {
+        self.letters.get(index)
+    }
+
+    pub fn get_letter_mut(&mut self, index: usize) -> Option<&mut Letter> {
+        self.letters.get_mut(index)
     }
 }
 

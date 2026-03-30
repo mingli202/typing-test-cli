@@ -15,7 +15,7 @@ pub struct Letter {
 
     /// states for the letter.
     /// used to style this letter white (typed), red (error), gray (not typed)
-    typed_state: TypedState,
+    pub(super) typed_state: TypedState,
 
     /// Used to position the cursor correctly in the UI
     char_id: usize,
@@ -41,22 +41,12 @@ impl Letter {
         }
     }
 
-    /// sets the typed letter
-    pub fn set_typed_state(&mut self, typed_letter: TypedState) {
-        self.typed_state = typed_letter;
-    }
-
     /// Whether this letter is right!
     pub fn is_error(&self) -> bool {
         match self.typed_state {
             TypedState::Typed(c) => c != self.letter,
             _ => true,
         }
-    }
-
-    /// gets the typed letter
-    pub fn typed_state(&self) -> &TypedState {
-        &self.typed_state
     }
 }
 

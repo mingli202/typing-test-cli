@@ -73,8 +73,8 @@ impl TypingTest {
                     Letter::new(c, word_len, self.word_index).with_typed_letter(TypedState::Extra),
                 );
             } else {
-                let curr_letter = &mut curr_word.letters[self.letter_index];
-                curr_letter.set_typed_state(TypedState::Typed(c));
+                let curr_letter = curr_word.get_letter_mut(self.letter_index).unwrap();
+                curr_letter.typed_state = TypedState::Typed(c);
             }
 
             let is_last_word_error = curr_word.is_error();
@@ -165,10 +165,10 @@ impl TypingTest {
         if let Some(letter) = self.get_curr_letter_mut() {
             if is_overshoot {
                 if let Some(word) = self.get_curr_word_mut() {
-                    word.letters.pop();
+                    word.pop();
                 }
             } else {
-                letter.set_typed_state(TypedState::NotTyped);
+                letter.typed_state = TypedState::NotTyped;
             }
         }
     }
@@ -186,14 +186,14 @@ impl TypingTest {
     /// Get current letter
     pub fn get_curr_letter(&self) -> Option<&Letter> {
         self.get_curr_word()
-            .and_then(|word| word.letters.get(self.letter_index))
+            .and_then(|word| word.get_letter(self.letter_index))
     }
 
     /// Get current letter
     pub fn get_curr_letter_mut(&mut self) -> Option<&mut Letter> {
         let letter_index = self.letter_index;
         self.get_curr_word_mut()
-            .and_then(|word| word.letters.get_mut(letter_index))
+            .and_then(|word| word.get_letter_mut(letter_index))
     }
 
     /// Handle the space character
@@ -273,8 +273,6 @@ mod typing_test_test {
     #[test]
     fn on_space_end_of_word() {
         let mut test = TypingTest::new("Hello world!");
-        test.word_index = 0;
-        test.letter_index = 5;
 
         "Hello".chars().for_each(|c| {
             test.on_type(c);
@@ -416,7 +414,7 @@ mod typing_test_test {
                 .unwrap()
                 .letters
                 .iter()
-                .map(|letter| letter.get_typed_state().clone())
+                .map(|letter| letter.typed_state.clone())
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('w'),
@@ -441,7 +439,7 @@ mod typing_test_test {
                 .unwrap()
                 .letters
                 .iter()
-                .map(|letter| letter.get_typed_state().clone())
+                .map(|letter| letter.typed_state.clone())
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('a'),
@@ -540,7 +538,7 @@ mod typing_test_test {
             test.words[1]
                 .letters
                 .iter()
-                .map(|letter| letter.get_typed_state().clone())
+                .map(|letter| letter.typed_state.clone())
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('W'),
