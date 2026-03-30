@@ -99,7 +99,7 @@ impl Data {
 
         for _ in 0..n {
             while ind == last {
-                ind = rng.gen_range(0..self.words.len()) as i32;
+                ind = rng.random_range(0..self.words.len()) as i32;
             }
 
             v.push(&self.words[ind as usize]);
@@ -111,7 +111,7 @@ impl Data {
     }
 
     pub fn get_n_random_quotes(&self, n: usize) -> Vec<&Quote> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let mut v = Vec::with_capacity(n);
 
@@ -120,7 +120,7 @@ impl Data {
 
         for _ in 0..n {
             while ind == last {
-                ind = rng.gen_range(0..self.quotes.len()) as i32;
+                ind = rng.random_range(0..self.quotes.len()) as i32;
             }
 
             v.push(&self.quotes[ind as usize]);
