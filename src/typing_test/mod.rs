@@ -3,138 +3,11 @@ use std::time::{Duration, Instant};
 
 use itertools::Itertools;
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub enum TypedState {
-    Typed(char),
-    NotTyped,
-    Extra,
-}
+use self::letter::{Letter, TypedState};
+use self::word::Word;
 
-/// Represents a single letter of a word
-#[derive(Debug)]
-pub struct Letter {
-    /// Its letter
-    letter: char,
-
-    /// states for the letter.
-    /// used to style this letter white (typed), red (error), gray (not typed)
-    typed_letter: TypedState,
-
-    /// Used to position the cursor correctly in the UI
-    char_id: usize,
-    word_id: usize,
-}
-
-impl Letter {
-    /// Creates a new Letter with the given letter, char_id, and word_id
-    pub fn new(letter: char, char_id: usize, word_id: usize) -> Self {
-        Letter {
-            letter,
-            typed_letter: TypedState::NotTyped,
-            char_id,
-            word_id,
-        }
-    }
-
-    /// Whether this letter is right!
-    pub fn is_error(&self) -> bool {
-        match self.typed_letter {
-            TypedState::Typed(c) => c != self.letter,
-            _ => true,
-        }
-    }
-}
-
-/// Represent a single word of the text to type
-#[derive(Debug)]
-pub struct Word {
-    /// Index of the word in the typing test
-    id: usize,
-
-    /// Its letters
-    letters: Vec<Letter>,
-
-    /// The underlying word. Kept so we can easily render the word
-    word: String,
-
-    /// Which letter the user last typed
-    last_typed_letter_index: usize,
-}
-
-impl Word {
-    /// Creates a new Word from the given string and id
-    pub fn new(text: &str, id: usize) -> Word {
-        Word {
-            letters: text
-                .chars()
-                .enumerate()
-                .map(|(i, letter)| Letter::new(letter, i, id))
-                .collect(),
-            id,
-            word: text.to_string(),
-            last_typed_letter_index: 0,
-        }
-    }
-
-    /// Whether any letter is errored
-    /// If a word is errored, there will be a red underline
-    /// This error is only computed for typed words (e.g. every word before the current word)
-    pub fn is_error(&self) -> bool {
-        self.letters.iter().any(|letter| letter.is_error())
-    }
-
-    /// Push a letter to the word
-    pub fn push(&mut self, letter: Letter) {
-        self.letters.push(letter)
-    }
-
-    /// Pops the last letter
-    pub fn pop(&mut self) -> Option<Letter> {
-        self.letters.pop()
-    }
-
-    /// Gets the length of all its typed and untyped letters
-    pub fn letters_len(&self) -> usize {
-        self.letters.len()
-    }
-
-    /// Gets the actual length of the word to type
-    pub fn actual_len(&self) -> usize {
-        self.word.len()
-    }
-
-    /// Gets the number of letter typed excluding extras
-    pub fn n_letters_typed(&self) -> usize {
-        self.letters
-            .iter()
-            .filter(|letter| matches!(letter.typed_letter, TypedState::Typed(_)))
-            .count()
-    }
-
-    /// String representation but with only typed letters
-    pub fn to_string_typed(&self) -> String {
-        self.letters
-            .iter()
-            .filter_map(|letter| match letter.typed_letter {
-                TypedState::Typed(c) => Some(c),
-                _ => None,
-            })
-            .collect::<String>()
-    }
-}
-
-impl Display for Word {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.letters
-                .iter()
-                .map(|letter| letter.letter)
-                .collect::<String>()
-        )
-    }
-}
+mod letter;
+mod word;
 
 /// Represents a single typing test
 pub struct TypingTest {
@@ -196,15 +69,12 @@ impl TypingTest {
 
             let is_overshoot = self.letter_index >= word_len;
             if is_overshoot {
-                curr_word.push(Letter {
-                    letter: c,
-                    typed_letter: TypedState::Extra,
-                    char_id: word_len,
-                    word_id: self.word_index,
-                });
+                curr_word.push(
+                    Letter::new(c, word_len, self.word_index).with_typed_letter(TypedState::Extra),
+                );
             } else {
                 let curr_letter = &mut curr_word.letters[self.letter_index];
-                curr_letter.typed_letter = TypedState::Typed(c);
+                curr_letter.set_typed_state(TypedState::Typed(c));
             }
 
             let is_last_word_error = curr_word.is_error();
@@ -291,13 +161,14 @@ impl TypingTest {
             self.letter_index -= 1;
         }
 
+        let is_overshoot = self.letter_index >= self.words[self.word_index].actual_len();
         if let Some(letter) = self.get_curr_letter_mut() {
-            if matches!(letter.typed_letter, TypedState::Extra) {
+            if is_overshoot {
                 if let Some(word) = self.get_curr_word_mut() {
                     word.letters.pop();
                 }
             } else {
-                letter.typed_letter = TypedState::NotTyped;
+                letter.set_typed_state(TypedState::NotTyped);
             }
         }
     }
@@ -404,10 +275,10 @@ mod typing_test_test {
         let mut test = TypingTest::new("Hello world!");
         test.word_index = 0;
         test.letter_index = 5;
-        test.words[0]
-            .letters
-            .iter_mut()
-            .for_each(|letter| letter.typed_letter = TypedState::Typed(letter.letter));
+
+        "Hello".chars().for_each(|c| {
+            test.on_type(c);
+        });
 
         test.on_space();
 
@@ -539,13 +410,13 @@ mod typing_test_test {
         "wers".chars().any(|c| test.on_type(c));
         test.on_backspace();
 
-        assert_eq!(test.get_curr_letter().unwrap().letter, 'd');
+        assert_eq!(test.letter_index, 3);
         assert_eq!(
             test.get_curr_word()
                 .unwrap()
                 .letters
                 .iter()
-                .map(|letter| letter.typed_letter.clone())
+                .map(|letter| letter.get_typed_state().clone())
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('w'),
@@ -570,7 +441,7 @@ mod typing_test_test {
                 .unwrap()
                 .letters
                 .iter()
-                .map(|letter| letter.typed_letter.clone())
+                .map(|letter| letter.get_typed_state().clone())
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('a'),
@@ -592,7 +463,7 @@ mod typing_test_test {
         test.on_space();
         test.on_backspace();
 
-        assert_eq!(test.get_curr_letter().unwrap().letter, 'd');
+        assert_eq!(test.letter_index, 3);
     }
 
     #[test]
@@ -669,7 +540,7 @@ mod typing_test_test {
             test.words[1]
                 .letters
                 .iter()
-                .map(|letter| letter.typed_letter.clone())
+                .map(|letter| letter.get_typed_state().clone())
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('W'),
