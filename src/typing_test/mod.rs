@@ -1,8 +1,11 @@
 use std::fmt::Display;
 use std::time::{Duration, Instant};
 
+use color_eyre::owo_colors::Style;
 use itertools::Itertools;
-use ratatui::widgets::Widget;
+use ratatui::style::{Color, Stylize};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Paragraph, Widget, Wrap};
 
 use self::letter::{Letter, TypedState};
 use self::word::Word;
@@ -243,6 +246,36 @@ impl Widget for &TypingTest {
     where
         Self: Sized,
     {
+        let text = self
+            .words
+            .iter()
+            .map(|word| {
+                word.letters
+                    .iter()
+                    .map(|letter| match letter.typed_state {
+                        TypedState::Typed(c) => {
+                            Span::raw(c.to_string()).fg(if c == letter.letter {
+                                Color::White
+                            } else {
+                                Color::Red
+                            })
+                        }
+                        TypedState::NotTyped => {
+                            Span::raw(letter.letter.to_string()).fg(Color::Gray)
+                        }
+                        TypedState::Extra => Span::raw(letter.letter.to_string()).fg(Color::Red),
+                    })
+                    .collect::<Vec<Span>>()
+            })
+            .collect::<Vec<Vec<Span>>>()
+            .join(&Span::raw(" "));
+
+        let line = Line::from(text);
+        let text = Text::from(line);
+
+        Paragraph::new(text)
+            .wrap(Wrap { trim: true })
+            .render(area, buf);
     }
 }
 

@@ -11,7 +11,7 @@ pub enum TypedState {
 #[derive(Debug)]
 pub struct Letter {
     /// Its letter
-    letter: char,
+    pub(super) letter: char,
 
     /// states for the letter.
     /// used to style this letter white (typed), red (error), gray (not typed)

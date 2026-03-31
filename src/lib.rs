@@ -1,7 +1,7 @@
 use std::io;
 
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{self, Event};
+use ratatui::crossterm::event::{self, Event, KeyCode};
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 use ratatui::{DefaultTerminal, Frame};
@@ -54,7 +54,32 @@ impl State {
     }
 
     fn handle_events(&mut self, event: Event) -> Transition {
-        Transition::None
+        match self {
+            State::TypingTestState {
+                typing_test,
+                is_typing,
+            } => {
+                if let Some(key) = event.as_key_press_event() {
+                    match key.code {
+                        KeyCode::Char(c) => {
+                            if typing_test.on_type(c) {
+                                Transition::Push(State::EndScreenState)
+                            } else {
+                                Transition::None
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            typing_test.on_backspace();
+                            Transition::None
+                        }
+                        _ => Transition::None,
+                    }
+                } else {
+                    Transition::None
+                }
+            }
+            _ => Transition::None,
+        }
     }
 }
 
@@ -90,6 +115,13 @@ impl App {
 
     fn handle_events(&mut self) -> io::Result<()> {
         if let Ok(event) = event::read() {
+            if let Some(event::KeyEvent {
+                code: KeyCode::Esc, ..
+            }) = event.as_key_press_event()
+            {
+                self.exit = true
+            }
+
             let transition = self.state.handle_events(event);
             self.handle_transition(transition);
         }
