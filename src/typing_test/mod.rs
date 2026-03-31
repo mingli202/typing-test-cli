@@ -136,7 +136,7 @@ impl TypingTest {
             Some(elapsed) => {
                 let final_typed_words =
                     self.total_letters_typed() as f32 / 5.0 - self.n_wrongs() as f32;
-                final_typed_words / elapsed.as_secs_f32()
+                60.0 * final_typed_words / elapsed.as_secs_f32()
             }
             None => 0.0,
         }
@@ -147,7 +147,7 @@ impl TypingTest {
         match self.elapsed_since_start_sec() {
             Some(elapsed) => {
                 let final_typed_words = self.total_letters_typed() as f32 / 5.0;
-                final_typed_words / elapsed.as_secs_f32()
+                60.0 * final_typed_words / elapsed.as_secs_f32()
             }
             None => 0.0,
         }
