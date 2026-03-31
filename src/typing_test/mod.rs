@@ -344,7 +344,7 @@ impl Widget for &TypingTest {
             .enumerate()
             .map(|(i, word)| {
                 if i == cursor_index {
-                    word.reversed()
+                    word.bg(Color::Gray).fg(Color::Black)
                 } else {
                     word
                 }
