@@ -2,7 +2,7 @@ use std::io;
 
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{self, Event, KeyCode};
-use ratatui::layout::Rect;
+use ratatui::layout::{Constraint, Rect};
 use ratatui::macros::text;
 use ratatui::widgets::{Paragraph, Widget};
 use ratatui::{DefaultTerminal, Frame};
@@ -50,12 +50,13 @@ impl Widget for &State {
                 accuracy,
                 source,
             } => {
-                Paragraph::new(text![
-                    format!("WPM: {:.1}", wpm),
-                    format!("ACC: {}%", accuracy),
-                ])
-                .centered()
-                .render(area, buf);
+                let text = text![format!("WPM: {:.1} ACC: {}%", wpm, accuracy)];
+                let area = area.centered(
+                    Constraint::Length(text.width() as u16),
+                    Constraint::Length(1),
+                );
+
+                Paragraph::new(text).centered().render(area, buf);
             }
         }
     }

@@ -117,12 +117,17 @@ impl TypingTest {
 
     /// Total number of letters typed excluding extras
     pub fn total_letters_typed(&self) -> usize {
-        self.words.iter().map(|word| word.n_letters_typed()).sum()
+        self.words
+            .iter()
+            .map(|word| word.n_letters_typed())
+            .sum::<usize>()
+            + self.words.len()
+            - 1
     }
 
     /// Starts the typing test timer if it hasn't been started
     pub fn start(&mut self) {
-        if (self.has_started()) {
+        if self.has_started() {
             return;
         }
 
