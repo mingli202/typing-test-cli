@@ -1,5 +1,8 @@
 use std::fmt::Display;
 
+use ratatui::style::{Color, Stylize};
+use ratatui::text::Span;
+
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum TypedState {
     Typed(char),
@@ -46,6 +49,19 @@ impl Letter {
         match self.typed_state {
             TypedState::Typed(c) => c != self.letter,
             _ => true,
+        }
+    }
+
+    /// Gets the span representation of this letter
+    pub fn to_span(&self) -> Span<'_> {
+        match self.typed_state {
+            TypedState::Typed(c) => Span::raw(c.to_string()).fg(if c == self.letter {
+                Color::White
+            } else {
+                Color::Red
+            }),
+            TypedState::NotTyped => Span::raw(self.letter.to_string()).fg(Color::Gray),
+            TypedState::Extra => Span::raw(self.letter.to_string()).fg(Color::Red),
         }
     }
 }

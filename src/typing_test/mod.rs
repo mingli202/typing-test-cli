@@ -200,6 +200,16 @@ impl TypingTest {
             .and_then(|word| word.get_letter_mut(letter_index))
     }
 
+    /// Get the index of the letter if all the letter were flattened into a singlular array
+    fn cursor_index(&self) -> usize {
+        self.words[0..self.word_index]
+            .iter()
+            .map(|word| word.letters_len())
+            .sum::<usize>()
+            + self.word_index
+            + self.letter_index
+    }
+
     /// Handle the space character
     /// Moves the cursor to the next word and reset the letter index to 0
     /// If it's the last word, mark it as error and end the test
@@ -252,25 +262,27 @@ impl Widget for &TypingTest {
             .map(|word| {
                 word.letters
                     .iter()
-                    .map(|letter| match letter.typed_state {
-                        TypedState::Typed(c) => {
-                            Span::raw(c.to_string()).fg(if c == letter.letter {
-                                Color::White
-                            } else {
-                                Color::Red
-                            })
-                        }
-                        TypedState::NotTyped => {
-                            Span::raw(letter.letter.to_string()).fg(Color::Gray)
-                        }
-                        TypedState::Extra => Span::raw(letter.letter.to_string()).fg(Color::Red),
-                    })
+                    .map(|letter| letter.to_span())
                     .collect::<Vec<Span>>()
             })
             .collect::<Vec<Vec<Span>>>()
-            .join(&Span::raw(" "));
+            .join(&Span::raw(" ").fg(Color::Gray));
 
-        let line = Line::from(text);
+        let cursor_index = self.cursor_index();
+
+        let text_with_cursor = text
+            .into_iter()
+            .enumerate()
+            .map(|(i, word)| {
+                if i == cursor_index {
+                    word.reversed()
+                } else {
+                    word
+                }
+            })
+            .collect::<Vec<Span>>();
+
+        let line = Line::from(text_with_cursor);
         let text = Text::from(line);
 
         Paragraph::new(text)
