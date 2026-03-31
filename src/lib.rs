@@ -69,8 +69,8 @@ impl State {
         }
     }
 
-    fn handle_events(&mut self, event: Event) -> Transition {
-        match self {
+    fn handle_events(app: &mut App, event: Event) -> Transition {
+        match &mut app.state {
             State::TypingTestState {
                 typing_test,
                 is_typing,
@@ -78,24 +78,26 @@ impl State {
                 if let Some(key) = event.as_key_press_event() {
                     match key.code {
                         KeyCode::Char(c) => {
+                            typing_test.start();
+
                             if typing_test.on_type(c) {
                                 let wpm = typing_test.net_wpm();
                                 let accuracy = typing_test.accuracy();
-                                Transition::Switch(State::EndScreenState {
+                                return Transition::Switch(State::EndScreenState {
                                     wpm,
                                     accuracy,
                                     source: "".to_string(),
-                                })
-                            } else {
-                                Transition::None
+                                });
                             }
+
+                            Transition::None
                         }
                         KeyCode::Backspace => {
                             typing_test.on_backspace();
                             Transition::None
                         }
                         KeyCode::Tab => {
-                            typing_test.reset();
+                            typing_test.next(&app.data.get_random_quote().quote);
                             Transition::None
                         }
                         _ => Transition::None,
@@ -104,7 +106,20 @@ impl State {
                     Transition::None
                 }
             }
-            _ => Transition::None,
+            State::EndScreenState { .. } => {
+                if let Some(key) = event.as_key_press_event() {
+                    return match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => Transition::Quit,
+                        KeyCode::Tab => Transition::Switch(State::TypingTestState {
+                            typing_test: TypingTest::new(&app.data.get_random_quote().quote),
+                            is_typing: false,
+                        }),
+                        _ => Transition::None,
+                    };
+                }
+
+                Transition::None
+            }
         }
     }
 }
@@ -148,7 +163,7 @@ impl App {
                 self.exit = true
             }
 
-            let transition = self.state.handle_events(event);
+            let transition = State::handle_events(self, event);
             self.handle_transition(transition);
         }
         Ok(())
