@@ -180,12 +180,12 @@ impl TypingTest {
     /// Gets the current wpm at the time called
     pub fn current_net_wpm(&self) -> f32 {
         match self.elapsed_since_start_sec() {
-            Some(elapsed) => {
+            Some(elapsed) if elapsed > Duration::from_secs(1) => {
                 let current_typed_words =
                     self.current_letters_typed() as f32 / 5.0 - self.n_current_wrongs() as f32;
                 60.0 * current_typed_words / elapsed.as_secs_f32()
             }
-            None => 0.0,
+            _ => 0.0,
         }
     }
 
