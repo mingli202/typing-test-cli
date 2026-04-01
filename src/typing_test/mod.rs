@@ -352,10 +352,9 @@ impl TypingTest {
 
             // draw cursor
             if self.word_index == i {
-                letters[self.letter_index] = letters[self.letter_index]
-                    .clone()
-                    .fg(Color::Black)
-                    .bg(Color::Gray);
+                if let Some(letter) = letters.get_mut(self.letter_index) {
+                    *letter = letter.clone().fg(Color::Black).bg(Color::Gray);
+                }
 
                 cursor_index = lines.len();
             }
