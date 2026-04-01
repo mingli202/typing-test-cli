@@ -3,7 +3,7 @@ use std::io;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{self, Event, KeyCode};
 use ratatui::layout::{Constraint, Offset, Rect};
-use ratatui::macros::text;
+use ratatui::macros::{line, text};
 use ratatui::style::{Color, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Widget};
@@ -40,7 +40,7 @@ impl Widget for &State {
     where
         Self: Sized,
     {
-        let typing_test_container = area
+        let typing_test_area = area
             .centered_vertically(Constraint::Length(3))
             .centered_horizontally(Constraint::Max(80));
 
@@ -49,7 +49,15 @@ impl Widget for &State {
                 typing_test,
                 is_typing,
             } => {
-                typing_test.render(typing_test_container, buf);
+                typing_test.render(typing_test_area, buf);
+
+                let wpm = typing_test.current_net_wpm();
+                let cur_index = typing_test.word_index;
+                let n_words = typing_test.n_words();
+                let stats_area = typing_test_area.offset(Offset { x: 0, y: -3 });
+                let line = line![format!("{}/{} {:.0}", cur_index, n_words, wpm)];
+
+                line.render(stats_area, buf);
             }
             State::EndScreenState {
                 wpm,

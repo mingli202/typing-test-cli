@@ -23,7 +23,7 @@ pub struct TypingTest {
     words: Vec<Word>,
 
     /// The current word the user is typing
-    word_index: usize,
+    pub(super) word_index: usize,
 
     /// The current letter in the current word to be typed
     letter_index: usize,
@@ -108,6 +108,22 @@ impl TypingTest {
         self.words.iter().filter(|word| word.is_error()).count()
     }
 
+    /// Gets the numbers of wrong words up to the current word the user is typing
+    pub fn n_current_wrongs(&self) -> usize {
+        self.words[..self.word_index]
+            .iter()
+            .filter(|word| word.is_error())
+            .count()
+            + if self.words[self.word_index].letters[..self.letter_index]
+                .iter()
+                .any(|letter| letter.is_error())
+            {
+                1
+            } else {
+                0
+            }
+    }
+
     /// Total number of letters typed excluding extras
     pub fn total_letters_typed(&self) -> usize {
         self.words
@@ -116,6 +132,16 @@ impl TypingTest {
             .sum::<usize>()
             + self.words.len()
             - 1
+    }
+
+    /// Total number of letters typed excluding extras currently
+    pub fn current_letters_typed(&self) -> usize {
+        self.words[..self.word_index]
+            .iter()
+            .map(|word| word.n_letters_typed())
+            .sum::<usize>()
+            + self.word_index
+            + self.letter_index
     }
 
     /// Starts the typing test timer if it hasn't been started
@@ -146,6 +172,18 @@ impl TypingTest {
             Some(elapsed) => {
                 let final_typed_words = self.total_letters_typed() as f32 / 5.0;
                 60.0 * final_typed_words / elapsed.as_secs_f32()
+            }
+            None => 0.0,
+        }
+    }
+
+    /// Gets the current wpm at the time called
+    pub fn current_net_wpm(&self) -> f32 {
+        match self.elapsed_since_start_sec() {
+            Some(elapsed) => {
+                let current_typed_words =
+                    self.current_letters_typed() as f32 / 5.0 - self.n_current_wrongs() as f32;
+                60.0 * current_typed_words / elapsed.as_secs_f32()
             }
             None => 0.0,
         }
@@ -216,11 +254,17 @@ impl TypingTest {
             .and_then(|word| word.get_letter_mut(letter_index))
     }
 
+    /// Get accuracy
     pub fn accuracy(&self) -> usize {
         let total_correct_letters = self.total_correct_letters_typed();
         let total_letters = self.total_letters();
 
         100 * total_correct_letters / total_letters
+    }
+
+    /// The amount of words ot type
+    pub fn n_words(&self) -> usize {
+        self.words.len()
     }
 
     /// Handle the space character
