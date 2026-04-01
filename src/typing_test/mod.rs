@@ -39,11 +39,7 @@ pub struct TypingTest {
 impl TypingTest {
     /// Creates a new TypingTest with the given &str
     pub fn new(text: &str) -> Self {
-        let words: Vec<Word> = text
-            .split(" ")
-            .enumerate()
-            .map(|(id, word)| Word::new(word, id))
-            .collect();
+        let words: Vec<Word> = text.split(" ").map(Word::new).collect();
 
         TypingTest {
             word_index: 0,
@@ -87,9 +83,7 @@ impl TypingTest {
 
             let is_overshoot = self.letter_index >= word_len;
             if is_overshoot {
-                curr_word.push(
-                    Letter::new(c, word_len, self.word_index).with_typed_letter(TypedState::Extra),
-                );
+                curr_word.push(Letter::new(c).with_typed_letter(TypedState::Extra));
             } else {
                 let curr_letter = curr_word.get_letter_mut(self.letter_index).unwrap();
                 curr_letter.typed_state = TypedState::Typed(c);
@@ -289,7 +283,7 @@ impl TypingTest {
     fn to_words(text: &str) -> Vec<Word> {
         text.split(" ")
             .enumerate()
-            .map(|(id, word)| Word::new(word, id))
+            .map(|(id, word)| Word::new(word))
             .collect()
     }
 
