@@ -1,12 +1,12 @@
 use std::fmt::Display;
 use std::time::{Duration, Instant};
 
-use color_eyre::owo_colors::Style;
 use itertools::Itertools;
 use ratatui::layout::Constraint;
+use ratatui::macros::line;
 use ratatui::style::{Color, Stylize};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Paragraph, Widget, Wrap};
+use ratatui::widgets::{Paragraph, Widget, Wrap};
 
 use self::letter::{Letter, TypedState};
 use self::word::Word;
@@ -303,10 +303,44 @@ impl TypingTest {
             .collect()
     }
 
+    /// Resets the state of its words
     fn reset_words(&mut self) {
         self.words.iter_mut().for_each(|word| {
             word.reset();
         });
+    }
+
+    /// Returns list
+    fn split_into_lines(&self, max_width: usize) -> Text<'_> {
+        let mut lines: Vec<Line> = vec![];
+        let mut current_line: Line = line![];
+
+        self.words.iter().for_each(|word| {
+            let mut letters = word
+                .letters
+                .iter()
+                .map(|letter| letter.to_span())
+                .collect_vec();
+
+            // add space
+            letters.push(Span::raw(" "));
+
+            let line = Line::from(letters);
+            let width_so_far = current_line.width();
+
+            if width_so_far + line.width() >= max_width {
+                lines.push(current_line.clone());
+                current_line = line;
+            } else {
+                current_line
+                    .spans
+                    .append(&mut line.into_iter().collect_vec());
+            }
+        });
+
+        lines.push(current_line);
+
+        Text::from(lines)
     }
 }
 
@@ -325,42 +359,13 @@ impl Widget for &TypingTest {
     where
         Self: Sized,
     {
-        let text = self
-            .words
-            .iter()
-            .map(|word| {
-                word.letters
-                    .iter()
-                    .map(|letter| letter.to_span())
-                    .collect::<Vec<Span>>()
-            })
-            .collect::<Vec<Vec<Span>>>()
-            .join(&Span::raw(" ").fg(Color::Gray));
-
-        let cursor_index = self.cursor_index();
-
-        let text_with_cursor = text
-            .into_iter()
-            .enumerate()
-            .map(|(i, word)| {
-                if i == cursor_index {
-                    word.bg(Color::Gray).fg(Color::Black)
-                } else {
-                    word
-                }
-            })
-            .collect::<Vec<Span>>();
-
-        let line = Line::from(text_with_cursor);
-        let text = Text::from(line);
-
         let container = area
             .centered_vertically(Constraint::Length(3))
             .centered_horizontally(Constraint::Max(80));
 
-        Paragraph::new(text)
-            .wrap(Wrap { trim: true })
-            .render(container, buf);
+        let text = self.split_into_lines(container.width as usize);
+
+        Paragraph::new(text).render(container, buf);
     }
 }
 
