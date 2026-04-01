@@ -54,7 +54,7 @@ impl Widget for &State {
                 let wpm = f32::max(typing_test.current_net_wpm(), 0.0);
                 let cur_index = typing_test.word_index;
                 let n_words = typing_test.n_words();
-                let stats_area = typing_test_area.offset(Offset { x: 0, y: -3 });
+                let stats_area = typing_test_area.offset(Offset { x: 0, y: -2 });
                 let line = line![format!("{}/{} {:.0}", cur_index, n_words, wpm)];
 
                 line.render(stats_area, buf);
@@ -142,12 +142,11 @@ impl State {
 
     /// Renders the menu of keybinds at the bottom
     fn render_bottom_menu(area: Rect, buf: &mut Buffer) {
-        let mut menu_area = area.centered_horizontally(Constraint::Percentage(50));
+        let line = Line::raw("Next <Tab> Quit <Esc>").fg(Color::Gray);
+        let mut menu_area = area.centered_horizontally(Constraint::Length(line.width() as u16));
         menu_area.y = area.bottom() - 2;
 
-        Line::raw("Next <Tab> Quit <Esc>")
-            .fg(Color::Gray)
-            .render(menu_area, buf);
+        line.render(menu_area, buf);
     }
 }
 
