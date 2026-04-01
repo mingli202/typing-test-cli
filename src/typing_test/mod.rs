@@ -307,6 +307,7 @@ impl TypingTest {
             // add space
             letters.push(Span::raw(" "));
 
+            // draw cursor
             if self.word_index == i {
                 letters[self.letter_index] = letters[self.letter_index]
                     .clone()
@@ -319,7 +320,8 @@ impl TypingTest {
             let line = Line::from(letters);
             let width_so_far = current_line.width();
 
-            if width_so_far + line.width() >= max_width {
+            let is_overflow = width_so_far + line.width() >= max_width;
+            if is_overflow {
                 lines.push(current_line.clone());
                 current_line = line;
 
