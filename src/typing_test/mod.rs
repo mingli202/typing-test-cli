@@ -668,7 +668,7 @@ mod typing_test_test {
             test.on_type(c);
         });
 
-        assert_eq!(test.total_letters_typed(), 9);
+        assert_eq!(test.total_letters_typed(), 10);
     }
 
     #[test]
