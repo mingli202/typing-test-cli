@@ -143,7 +143,7 @@ impl State {
 
     /// Renders the menu of keybinds at the bottom
     fn render_bottom_menu(area: Rect, buf: &mut Buffer) {
-        let line = Line::raw("Next <Tab> Quit <Esc>").fg(Color::Gray);
+        let line = Line::raw("Next <Tab>  Quit <Esc>").fg(Color::Gray);
         let mut menu_area = area.centered_horizontally(Constraint::Length(line.width() as u16));
         menu_area.y = area.bottom() - 2;
 
