@@ -154,7 +154,9 @@ impl State {
                 stats_last_updated_time,
                 stats,
             } => {
-                if stats_last_updated_time.elapsed() > Duration::from_secs(1) {
+                if typing_test.has_started()
+                    && stats_last_updated_time.elapsed() > Duration::from_secs(1)
+                {
                     stats.wpm = typing_test.current_net_wpm();
                     stats.current_index = typing_test.word_index;
                     *stats_last_updated_time = Instant::now();
