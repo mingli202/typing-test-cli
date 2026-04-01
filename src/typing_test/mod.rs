@@ -299,7 +299,8 @@ impl TypingTest {
 
     /// Get total correct letters
     fn total_correct_letters_typed(&self) -> usize {
-        self.words
+        (self
+            .words
             .iter()
             .map(|word| {
                 word.letters
@@ -308,18 +309,19 @@ impl TypingTest {
                     .count()
             })
             .sum::<usize>()
-            + self.words.len()
-            - 1
+            + self.words.len())
+        .saturating_sub(1)
     }
 
     /// The total amount of characters of this test.
     fn total_letters(&self) -> usize {
-        self.words
+        (self
+            .words
             .iter()
             .map(|word| word.actual_len())
             .sum::<usize>()
-            + self.words.len()
-            - 1
+            + self.words.len())
+        .saturating_sub(1)
     }
 
     /// Text to words
