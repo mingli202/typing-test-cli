@@ -71,10 +71,10 @@ impl Widget for &State {
                 accuracy,
                 source,
             } => {
-                let text = text![format!("WPM: {:.1} ACC: {}%", wpm, accuracy)];
+                let text = text![format!("WPM: {:.1}", wpm), format!("ACC: {}%", accuracy),];
                 let area = area.centered(
                     Constraint::Length(text.width() as u16),
-                    Constraint::Length(1),
+                    Constraint::Length(text.height() as u16),
                 );
 
                 Paragraph::new(text).centered().render(area, buf);
