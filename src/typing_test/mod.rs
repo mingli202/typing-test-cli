@@ -134,14 +134,14 @@ impl TypingTest {
             - 1
     }
 
-    /// Total number of letters typed excluding extras currently
+    /// Total number of letters typed excluding extras up to the currently typed word
     pub fn current_letters_typed(&self) -> usize {
         self.words[..self.word_index]
             .iter()
             .map(|word| word.n_letters_typed())
             .sum::<usize>()
-            + self.word_index
-            + self.letter_index
+            + self.word_index   // for spaces
+            + self.letter_index // for current word letters
     }
 
     /// Starts the typing test timer if it hasn't been started
