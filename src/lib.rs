@@ -231,7 +231,7 @@ impl State {
         let last_instant = history.last().unwrap_or(&(0.0, 0.0)).0;
 
         let x_axis = Axis::default()
-            .title("time")
+            .title("time (s)")
             .style(Style::default().white())
             .bounds([first_instant, last_instant])
             .labels([
