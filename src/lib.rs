@@ -5,9 +5,10 @@ use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{self, Event, KeyCode};
 use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect};
 use ratatui::macros::{line, text};
-use ratatui::style::{Color, Stylize};
+use ratatui::style::{Color, Style, Stylize};
+use ratatui::symbols::Marker;
 use ratatui::text::Line;
-use ratatui::widgets::{Paragraph, Widget, Wrap};
+use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Widget, Wrap};
 use ratatui::{DefaultTerminal, Frame};
 
 use self::data::Data;
@@ -26,7 +27,7 @@ pub enum Transition {
 
 #[derive(Default)]
 pub struct TypingStats {
-    wpm: f32,
+    wpm: f64,
     current_index: usize,
 }
 
@@ -36,11 +37,13 @@ pub enum State {
         stats_last_updated_time: Instant,
         stats: TypingStats,
         data: Data,
+        history: Vec<(f64, f64)>,
     },
     EndScreenState {
-        wpm: f32,
+        wpm: f64,
         accuracy: usize,
         source: String,
+        history: Vec<(f64, f64)>,
     },
 }
 
@@ -49,9 +52,8 @@ impl Widget for &State {
     where
         Self: Sized,
     {
-        let typing_test_area = area
-            .centered_vertically(Constraint::Length(3))
-            .centered_horizontally(Constraint::Max(80));
+        let area = area.centered_horizontally(Constraint::Max(80));
+        let typing_test_area = area.centered_vertically(Constraint::Length(3));
 
         match self {
             State::TypingTestState {
@@ -71,6 +73,8 @@ impl Widget for &State {
                 wpm,
                 accuracy,
                 source,
+                history,
+                ..
             } => {
                 let layout = Layout::default()
                     .direction(Direction::Vertical)
@@ -89,6 +93,8 @@ impl Widget for &State {
                     .wrap(Wrap { trim: true })
                     .centered()
                     .render(stats_area, buf);
+
+                State::render_endscreen_graph(layout[0], buf, history);
             }
         }
 
@@ -105,13 +111,17 @@ impl State {
             stats_last_updated_time: Instant::now(),
             stats: TypingStats::default(),
             data,
+            history: vec![],
         }
     }
 
     fn handle_events(app: &mut App, event: Event) -> Transition {
         match &mut app.state {
             State::TypingTestState {
-                typing_test, data, ..
+                typing_test,
+                data,
+                history,
+                ..
             } => {
                 if let Some(key) = event.as_key_press_event() {
                     match key.code {
@@ -125,6 +135,7 @@ impl State {
                                     wpm,
                                     accuracy,
                                     source: data.source.clone(),
+                                    history: history.clone(),
                                 });
                             }
 
@@ -161,13 +172,20 @@ impl State {
                 typing_test,
                 stats_last_updated_time,
                 stats,
+                history,
                 ..
             } => {
                 if typing_test.has_started()
+                    && matches!(typing_test.elapsed_since_start_sec(), Some(duration) if duration > Duration::from_secs(1))
                     && stats_last_updated_time.elapsed() > Duration::from_secs(1)
                 {
                     stats.wpm = typing_test.current_net_wpm();
                     stats.current_index = typing_test.word_index;
+
+                    if let Some(elapsed) = typing_test.elapsed_since_start_sec() {
+                        history.push((elapsed.as_secs_f64(), stats.wpm));
+                    }
+
                     *stats_last_updated_time = Instant::now();
                 }
             }
@@ -182,6 +200,50 @@ impl State {
         menu_area.y = area.bottom() - 2;
 
         line.render(menu_area, buf);
+    }
+
+    fn render_endscreen_graph(area: Rect, buf: &mut Buffer, history: &[(f64, f64)]) {
+        let datasets = vec![
+            Dataset::default()
+                .name("wpm history")
+                .marker(Marker::Braille)
+                .graph_type(GraphType::Line)
+                .data(history),
+        ];
+
+        let max_wpm = history
+            .iter()
+            .map(|(_, wpm)| wpm.ceil() as i32)
+            .max()
+            .unwrap_or(0);
+
+        let y_axis = Axis::default()
+            .title("wpm")
+            .style(Style::default().white())
+            .bounds([0.0, max_wpm as f64])
+            .labels([
+                "0".to_string(),
+                (max_wpm / 2).to_string(),
+                max_wpm.to_string(),
+            ]);
+
+        let first_instant = history.first().unwrap_or(&(0.0, 0.0)).0;
+        let last_instant = history.last().unwrap_or(&(0.0, 0.0)).0;
+
+        let x_axis = Axis::default()
+            .title("time")
+            .style(Style::default().white())
+            .bounds([first_instant, last_instant])
+            .labels([
+                format!("{:.0}", first_instant),
+                format!("{:.0}", last_instant / 2.0),
+                format!("{:.1}", last_instant),
+            ]);
+
+        Chart::new(datasets)
+            .x_axis(x_axis)
+            .y_axis(y_axis)
+            .render(area, buf);
     }
 }
 
