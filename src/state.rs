@@ -121,7 +121,8 @@ impl State {
                         KeyCode::Char(c) => {
                             typing_test.start();
 
-                            if typing_test.on_type(c) {
+                            let has_ended = typing_test.on_type(c);
+                            if has_ended {
                                 let wpm = typing_test.net_wpm();
                                 let accuracy = typing_test.accuracy();
                                 return Action::Switch(State::EndScreenState {
