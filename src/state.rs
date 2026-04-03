@@ -133,18 +133,15 @@ impl State {
                                     history: history.clone(),
                                 });
                             }
-
-                            Action::None
                         }
                         KeyCode::Backspace => {
                             typing_test.on_backspace();
-                            Action::None
                         }
-                        KeyCode::Tab => Action::Switch(State::new_typing_test()),
-                        _ => Action::None,
+                        KeyCode::Tab => {
+                            return Action::Switch(State::new_typing_test());
+                        }
+                        _ => {}
                     }
-                } else {
-                    Action::None
                 }
             }
             State::EndScreenState { .. } => {
@@ -155,10 +152,10 @@ impl State {
                         _ => Action::None,
                     };
                 }
-
-                Action::None
             }
-        }
+        };
+
+        Action::None
     }
 
     pub fn on_tick(&mut self) -> Action {
@@ -223,7 +220,7 @@ impl State {
         // Make the graph go to 1 if it's less for prettier graph
         let max_wpm = if max_wpm <= 1 { 1.0 } else { max_wpm as f64 };
         let y_axis = Axis::default()
-            .title("wpm")
+            .title("WPM")
             .style(Style::default().white())
             .bounds([0.0, max_wpm])
             .labels([
