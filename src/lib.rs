@@ -3,7 +3,7 @@ use std::time::Duration;
 use ratatui::crossterm::event::{self, KeyCode};
 use ratatui::{DefaultTerminal, Frame};
 
-use self::state::{Action, State};
+use self::state::{Action, Mode, State};
 
 pub mod data;
 mod state;
@@ -17,7 +17,7 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         App {
-            state: State::new_typing_test(),
+            state: State::new_typing_test(Mode::Words(10)),
             exit: false,
         }
     }

@@ -24,9 +24,10 @@ pub struct TypingStats {
     current_index: usize,
 }
 
+#[derive(Clone)]
 pub enum Mode {
     Quote,
-    Word(usize),
+    Words(usize),
 }
 
 pub enum State {
@@ -43,13 +44,17 @@ pub enum State {
         accuracy: usize,
         source: String,
         history: Vec<(f64, f64)>,
+        previous_mode: Mode,
     },
 }
 
 impl State {
     /// Gets a fresh typing test
-    pub fn new_typing_test() -> Self {
-        let data = Data::get_random_quote();
+    pub fn new_typing_test(mode: Mode) -> Self {
+        let data = match mode {
+            Mode::Quote => Data::get_random_quote(),
+            Mode::Words(n) => Data::get_n_random_words(n),
+        };
 
         State::TypingTestState {
             typing_test: TypingTest::new(&data.text),
@@ -57,7 +62,7 @@ impl State {
             stats: TypingStats::default(),
             data,
             history: vec![],
-            mode: Mode::Quote,
+            mode,
         }
     }
 
@@ -67,6 +72,7 @@ impl State {
                 typing_test,
                 data,
                 history,
+                mode,
                 ..
             } => {
                 if let Some(key) = event.as_key_press_event() {
@@ -83,6 +89,7 @@ impl State {
                                     accuracy,
                                     source: data.source.clone(),
                                     history: history.clone(),
+                                    previous_mode: mode.clone(),
                                 });
                             }
                         }
@@ -90,17 +97,19 @@ impl State {
                             typing_test.on_backspace();
                         }
                         KeyCode::Tab => {
-                            return Action::Switch(State::new_typing_test());
+                            return Action::Switch(State::new_typing_test(mode.clone()));
                         }
                         _ => {}
                     }
                 }
             }
-            State::EndScreenState { .. } => {
+            State::EndScreenState { previous_mode, .. } => {
                 if let Some(key) = event.as_key_press_event() {
                     return match key.code {
                         KeyCode::Char('q') | KeyCode::Esc => Action::Quit,
-                        KeyCode::Tab => Action::Switch(State::new_typing_test()),
+                        KeyCode::Tab => {
+                            Action::Switch(State::new_typing_test(previous_mode.clone()))
+                        }
                         _ => Action::None,
                     };
                 }
