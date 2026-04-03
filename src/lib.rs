@@ -3,8 +3,10 @@ use std::time::Duration;
 use ratatui::crossterm::event::{self, KeyCode};
 use ratatui::{DefaultTerminal, Frame};
 
+use self::config::Config;
 use self::state::{Action, State};
 
+mod config;
 pub mod data;
 mod state;
 mod typing_test;
@@ -15,9 +17,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
+        let config = Config::load().await;
+
         App {
-            state: State::new(),
+            state: State::new(config.mode),
             exit: false,
         }
     }
@@ -61,11 +65,5 @@ impl App {
             Action::Quit => self.exit = true,
             Action::None => (),
         }
-    }
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self::new()
     }
 }

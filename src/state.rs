@@ -8,6 +8,7 @@ use ratatui::style::{Color, Style, Stylize};
 use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Widget, Wrap};
+use serde::{Deserialize, Serialize};
 
 use crate::data::Data;
 use crate::typing_test::TypingTest;
@@ -24,8 +25,9 @@ pub struct TypingStats {
     current_index: usize,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum Mode {
+    #[default]
     Quote,
     Words(usize),
 }
@@ -77,13 +79,12 @@ impl Screen {
 }
 
 impl State {
-    pub fn new() -> Self {
-        let mode = Mode::Words(10);
-        let data = mode.get_data();
+    pub fn new(initial_mode: Mode) -> Self {
+        let data = initial_mode.get_data();
         State {
             history: vec![],
-            screen: Screen::new_typing_test(&data.text, mode.clone()),
-            mode,
+            screen: Screen::new_typing_test(&data.text, initial_mode.clone()),
+            mode: initial_mode,
             data,
         }
     }
