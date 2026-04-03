@@ -205,7 +205,6 @@ impl State {
     fn render_endscreen_graph(area: Rect, buf: &mut Buffer, history: &[(f64, f64)]) {
         let datasets = vec![
             Dataset::default()
-                .name("wpm history")
                 .marker(Marker::Braille)
                 .graph_type(GraphType::Line)
                 .data(history),
