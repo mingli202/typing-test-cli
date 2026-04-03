@@ -51,7 +51,7 @@ impl TypingTest {
 
     pub fn next(&mut self, text: &str) {
         self.reset();
-        self.words = Self::to_words(text);
+        self.words = to_words(text);
     }
 
     pub fn reset(&mut self) {
@@ -330,11 +330,6 @@ impl TypingTest {
         .saturating_sub(1)
     }
 
-    /// Text to words
-    fn to_words(text: &str) -> Vec<Word> {
-        text.split(" ").map(Word::new).collect()
-    }
-
     /// Resets the state of its words
     fn reset_words(&mut self) {
         self.words.iter_mut().for_each(|word| {
@@ -416,6 +411,11 @@ impl Widget for &TypingTest {
 
         Paragraph::new(text).scroll((offset, 0)).render(area, buf);
     }
+}
+
+/// Text to words
+fn to_words(text: &str) -> Vec<Word> {
+    text.split(" ").map(Word::new).collect()
 }
 
 #[cfg(test)]
