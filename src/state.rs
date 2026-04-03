@@ -24,7 +24,7 @@ pub struct TypingStats {
     current_index: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Mode {
     Quote,
     Words(usize),
@@ -115,28 +115,36 @@ impl State {
                         }
                         KeyCode::Left => {
                             *selected_mode = handle_left_arrow_in_selection(selected_mode);
-                            if !matches!(selected_mode, Mode::Words(0)) {
+                            if !matches!(selected_mode, Mode::Words(0))
+                                && *selected_mode != self.mode
+                            {
                                 self.mode = selected_mode.clone();
                                 self.new_typing_test();
                             }
                         }
                         KeyCode::Right => {
                             *selected_mode = handle_right_arrow_in_selection(selected_mode);
-                            if !matches!(selected_mode, Mode::Words(0)) {
+                            if !matches!(selected_mode, Mode::Words(0))
+                                && *selected_mode != self.mode
+                            {
                                 self.mode = selected_mode.clone();
                                 self.new_typing_test();
                             }
                         }
                         KeyCode::Up => {
                             *selected_mode = handle_up_arrow_in_selection(selected_mode);
-                            if !matches!(selected_mode, Mode::Words(0)) {
+                            if !matches!(selected_mode, Mode::Words(0))
+                                && *selected_mode != self.mode
+                            {
                                 self.mode = selected_mode.clone();
                                 self.new_typing_test();
                             }
                         }
                         KeyCode::Down => {
                             *selected_mode = handle_down_arrow_in_selection(selected_mode);
-                            if !matches!(selected_mode, Mode::Words(0)) {
+                            if !matches!(selected_mode, Mode::Words(0))
+                                && *selected_mode != self.mode
+                            {
                                 self.mode = selected_mode.clone();
                                 self.new_typing_test();
                             }
