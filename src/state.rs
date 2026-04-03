@@ -24,6 +24,11 @@ pub struct TypingStats {
     current_index: usize,
 }
 
+pub enum Mode {
+    Quote,
+    Word(usize),
+}
+
 pub enum State {
     TypingTestState {
         typing_test: TypingTest,
@@ -31,6 +36,7 @@ pub enum State {
         stats: TypingStats,
         data: Data,
         history: Vec<(f64, f64)>,
+        mode: Mode,
     },
     EndScreenState {
         wpm: f64,
@@ -38,61 +44,6 @@ pub enum State {
         source: String,
         history: Vec<(f64, f64)>,
     },
-}
-
-impl Widget for &State {
-    fn render(self, area: Rect, buf: &mut Buffer)
-    where
-        Self: Sized,
-    {
-        let area = area.centered_horizontally(Constraint::Max(80));
-        let typing_test_area = area.centered_vertically(Constraint::Length(3));
-
-        match self {
-            State::TypingTestState {
-                typing_test, stats, ..
-            } => {
-                typing_test.render(typing_test_area, buf);
-
-                let wpm = stats.wpm;
-                let cur_index = stats.current_index;
-                let n_words = typing_test.n_words();
-                let stats_area = typing_test_area.offset(Offset { x: 0, y: -2 });
-                let line = line![format!("{}/{} {:.0}", cur_index, n_words, wpm)];
-
-                line.render(stats_area, buf);
-            }
-            State::EndScreenState {
-                wpm,
-                accuracy,
-                source,
-                history,
-                ..
-            } => {
-                let layout = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .split(area);
-
-                let text = text![
-                    format!("WPM: {:.1}", wpm),
-                    format!("ACC: {}%", accuracy),
-                    format!(""),
-                    format!("{}", source),
-                ];
-                let stats_area = layout[1].offset(Offset { x: 0, y: 2 });
-
-                Paragraph::new(text)
-                    .wrap(Wrap { trim: true })
-                    .centered()
-                    .render(stats_area, buf);
-
-                State::render_endscreen_graph(layout[0], buf, history);
-            }
-        }
-
-        State::render_bottom_menu(area, buf);
-    }
 }
 
 impl State {
@@ -106,6 +57,7 @@ impl State {
             stats: TypingStats::default(),
             data,
             history: vec![],
+            mode: Mode::Quote,
         }
     }
 
@@ -246,5 +198,60 @@ impl State {
             .x_axis(x_axis)
             .y_axis(y_axis)
             .render(area, buf);
+    }
+}
+
+impl Widget for &State {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        let area = area.centered_horizontally(Constraint::Max(80));
+        let typing_test_area = area.centered_vertically(Constraint::Length(3));
+
+        match self {
+            State::TypingTestState {
+                typing_test, stats, ..
+            } => {
+                typing_test.render(typing_test_area, buf);
+
+                let wpm = stats.wpm;
+                let cur_index = stats.current_index;
+                let n_words = typing_test.n_words();
+                let stats_area = typing_test_area.offset(Offset { x: 0, y: -2 });
+                let line = line![format!("{}/{} {:.0}", cur_index, n_words, wpm)];
+
+                line.render(stats_area, buf);
+            }
+            State::EndScreenState {
+                wpm,
+                accuracy,
+                source,
+                history,
+                ..
+            } => {
+                let layout = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .split(area);
+
+                let text = text![
+                    format!("WPM: {:.1}", wpm),
+                    format!("ACC: {}%", accuracy),
+                    format!(""),
+                    format!("{}", source),
+                ];
+                let stats_area = layout[1].offset(Offset { x: 0, y: 2 });
+
+                Paragraph::new(text)
+                    .wrap(Wrap { trim: true })
+                    .centered()
+                    .render(stats_area, buf);
+
+                State::render_endscreen_graph(layout[0], buf, history);
+            }
+        }
+
+        State::render_bottom_menu(area, buf);
     }
 }
