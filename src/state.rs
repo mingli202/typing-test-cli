@@ -30,51 +30,71 @@ pub enum Mode {
     Words(usize),
 }
 
-pub enum State {
+impl Mode {
+    pub fn get_data(&self) -> Data {
+        match self {
+            Mode::Quote => Data::get_random_quote(),
+            Mode::Words(n) => Data::get_n_random_words(*n),
+        }
+    }
+}
+
+pub struct State {
+    history: Vec<(f64, f64)>,
+    mode: Mode,
+    data: Data,
+    screen: Screen,
+}
+
+pub enum Screen {
     TypingTestState {
         typing_test: TypingTest,
         stats_last_updated_time: Instant,
         stats: TypingStats,
-        data: Data,
-        history: Vec<(f64, f64)>,
-        mode: Mode,
     },
     EndScreenState {
         wpm: f64,
         accuracy: usize,
-        source: String,
-        history: Vec<(f64, f64)>,
-        previous_mode: Mode,
     },
 }
 
-impl State {
+impl Screen {
     /// Gets a fresh typing test
-    pub fn new_typing_test(mode: Mode) -> Self {
-        let data = match mode {
-            Mode::Quote => Data::get_random_quote(),
-            Mode::Words(n) => Data::get_n_random_words(n),
-        };
-
-        State::TypingTestState {
-            typing_test: TypingTest::new(&data.text),
+    pub fn new_typing_test(text: &str) -> Self {
+        Screen::TypingTestState {
+            typing_test: TypingTest::new(text),
             stats_last_updated_time: Instant::now(),
             stats: TypingStats::default(),
-            data,
-            history: vec![],
-            mode,
         }
     }
 
+    /// Gets a new end screen
+    pub fn new_end_screen(wpm: f64, accuracy: usize) -> Self {
+        Screen::EndScreenState { wpm, accuracy }
+    }
+}
+
+impl State {
+    pub fn new() -> Self {
+        let mode = Mode::Words(10);
+        let data = mode.get_data();
+        State {
+            history: vec![],
+            screen: Screen::new_typing_test(&data.text),
+            mode,
+            data,
+        }
+    }
+
+    pub fn new_typing_test(&mut self) {
+        self.history.clear();
+        self.data = self.mode.get_data();
+        self.screen = Screen::new_typing_test(&self.data.text);
+    }
+
     pub fn handle_events(&mut self, event: Event) -> Action {
-        match self {
-            State::TypingTestState {
-                typing_test,
-                data,
-                history,
-                mode,
-                ..
-            } => {
+        match &mut self.screen {
+            Screen::TypingTestState { typing_test, .. } => {
                 if let Some(key) = event.as_key_press_event() {
                     match key.code {
                         KeyCode::Char(c) => {
@@ -84,33 +104,29 @@ impl State {
                             if has_ended {
                                 let wpm = typing_test.net_wpm();
                                 let accuracy = typing_test.accuracy();
-                                return Action::Switch(State::EndScreenState {
-                                    wpm,
-                                    accuracy,
-                                    source: data.source.clone(),
-                                    history: history.clone(),
-                                    previous_mode: mode.clone(),
-                                });
+                                self.screen = Screen::new_end_screen(wpm, accuracy);
                             }
                         }
                         KeyCode::Backspace => {
                             typing_test.on_backspace();
                         }
                         KeyCode::Tab => {
-                            return Action::Switch(State::new_typing_test(mode.clone()));
+                            self.new_typing_test();
                         }
                         _ => {}
                     }
                 }
             }
-            State::EndScreenState { previous_mode, .. } => {
+            Screen::EndScreenState { .. } => {
                 if let Some(key) = event.as_key_press_event() {
-                    return match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => Action::Quit,
-                        KeyCode::Tab => {
-                            Action::Switch(State::new_typing_test(previous_mode.clone()))
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => {
+                            return Action::Quit;
                         }
-                        _ => Action::None,
+                        KeyCode::Tab => {
+                            self.new_typing_test();
+                        }
+                        _ => (),
                     };
                 }
             }
@@ -120,12 +136,11 @@ impl State {
     }
 
     pub fn on_tick(&mut self) -> Action {
-        match self {
-            Self::TypingTestState {
+        match &mut self.screen {
+            Screen::TypingTestState {
                 typing_test,
                 stats_last_updated_time,
                 stats,
-                history,
                 ..
             } => {
                 let elapsed = typing_test.elapsed_since_start_sec();
@@ -142,11 +157,11 @@ impl State {
                     }
 
                     if let Some(elapsed) = elapsed {
-                        history.push((elapsed.as_secs_f64(), wpm));
+                        self.history.push((elapsed.as_secs_f64(), wpm));
                     }
                 }
             }
-            Self::EndScreenState { .. } => {}
+            Screen::EndScreenState { .. } => {}
         };
 
         Action::None
@@ -218,8 +233,8 @@ impl Widget for &State {
         let area = area.centered_horizontally(Constraint::Max(80));
         let typing_test_area = area.centered_vertically(Constraint::Length(3));
 
-        match self {
-            State::TypingTestState {
+        match &self.screen {
+            Screen::TypingTestState {
                 typing_test, stats, ..
             } => {
                 typing_test.render(typing_test_area, buf);
@@ -232,13 +247,7 @@ impl Widget for &State {
 
                 line.render(stats_area, buf);
             }
-            State::EndScreenState {
-                wpm,
-                accuracy,
-                source,
-                history,
-                ..
-            } => {
+            Screen::EndScreenState { wpm, accuracy } => {
                 let layout = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -248,7 +257,7 @@ impl Widget for &State {
                     format!("WPM: {:.1}", wpm),
                     format!("ACC: {}%", accuracy),
                     format!(""),
-                    format!("{}", source),
+                    format!("{}", self.data.source),
                 ];
                 let stats_area = layout[1].offset(Offset { x: 0, y: 2 });
 
@@ -257,7 +266,7 @@ impl Widget for &State {
                     .centered()
                     .render(stats_area, buf);
 
-                State::render_endscreen_graph(layout[0], buf, history);
+                State::render_endscreen_graph(layout[0], buf, &self.history);
             }
         }
 
