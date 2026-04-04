@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -23,6 +23,7 @@ impl ToastLevel {
             Self::Error => Style::new().red(),
             Self::Success => Style::new().green(),
         }
+        .bg(Color::Black)
     }
 }
 
