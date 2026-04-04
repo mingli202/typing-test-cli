@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::task::JoinHandle;
 use tokio::{fs, io};
 
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn init(mut rx: UnboundedReceiver<ConfigUpdate>) {
+    pub fn init(mut rx: UnboundedReceiver<ConfigUpdate>) -> JoinHandle<()> {
         tokio::spawn(async move {
             while let Some(mut update) = rx.recv().await {
                 while let Ok(newer) = rx.try_recv() {
@@ -32,7 +33,7 @@ impl Config {
                     }
                 };
             }
-        });
+        })
     }
 
     pub async fn load() -> Config {
