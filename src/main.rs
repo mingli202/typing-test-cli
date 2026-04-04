@@ -8,7 +8,7 @@ async fn main() -> color_eyre::Result<()> {
 
     let (config_tx, config_rx) = mpsc::unbounded_channel();
 
-    Config::init(config_rx).await;
+    Config::init(config_rx);
     let mut app = App::new(config_tx).await;
     ratatui::run(|terminal| app.run(terminal))?;
 

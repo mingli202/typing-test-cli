@@ -17,12 +17,18 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn init(mut rx: UnboundedReceiver<ConfigUpdate>) {
+    pub fn init(mut rx: UnboundedReceiver<ConfigUpdate>) {
         tokio::spawn(async move {
-            while let Some(update) = rx.recv().await {
+            while let Some(mut update) = rx.recv().await {
+                while let Ok(newer) = rx.try_recv() {
+                    update = newer;
+                }
+
                 match update {
                     ConfigUpdate::Mode(mode) => {
-                        let _ = update_mode(mode).await;
+                        if let Err(err) = update_mode(mode).await {
+                            eprintln!("could not update config {}", err);
+                        }
                     }
                 };
             }
