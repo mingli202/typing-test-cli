@@ -6,10 +6,10 @@ use typing_test_tui::config::Config;
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
-    let (tx, rx) = mpsc::unbounded_channel();
+    let (config_tx, config_rx) = mpsc::unbounded_channel();
 
-    Config::init(rx).await;
-    let mut app = App::new(tx).await;
+    Config::init(config_rx).await;
+    let mut app = App::new(config_tx).await;
     ratatui::run(|terminal| app.run(terminal))?;
 
     Ok(())

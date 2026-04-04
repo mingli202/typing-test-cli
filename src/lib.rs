@@ -15,7 +15,7 @@ mod typing_test;
 pub struct App {
     state: State,
     exit: bool,
-    tx: UnboundedSender<ConfigUpdate>,
+    config_tx: UnboundedSender<ConfigUpdate>,
 }
 
 impl App {
@@ -25,7 +25,7 @@ impl App {
         App {
             state: State::new(config.mode),
             exit: false,
-            tx,
+            config_tx: tx,
         }
     }
 
@@ -67,7 +67,7 @@ impl App {
             Action::Quit => self.exit = true,
             Action::None => (),
             Action::UpdateMode(mode) => {
-                let _ = self.tx.send(ConfigUpdate::Mode(mode));
+                let _ = self.config_tx.send(ConfigUpdate::Mode(mode));
             }
         }
     }
