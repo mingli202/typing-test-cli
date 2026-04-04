@@ -6,30 +6,40 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use self::config::{Config, ConfigUpdate};
 use self::state::{Action, State};
+use self::toast::{Toast, ToastMessage};
 
 pub mod config;
 pub mod data;
 mod state;
+pub mod toast;
 mod typing_test;
 
 pub struct App {
     state: State,
     exit: bool,
     config_tx: UnboundedSender<ConfigUpdate>,
+    toast: Toast,
 }
 
 impl App {
-    pub async fn new(tx: UnboundedSender<ConfigUpdate>) -> Self {
-        let config = Config::load().await;
+    pub async fn new(tx: UnboundedSender<ConfigUpdate>, toast: Toast) -> Self {
+        let config = match Config::load().await {
+            Ok(config) => config,
+            Err(e) => {
+                let _ = toast.send(ToastMessage::error(e));
+                Config::default()
+            }
+        };
 
         App {
             state: State::new(config.mode),
             exit: false,
             config_tx: tx,
+            toast,
         }
     }
 
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> color_eyre::Result<()> {
+    pub fn run(mut self, terminal: &mut DefaultTerminal) -> color_eyre::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
