@@ -31,6 +31,7 @@ pub enum Mode {
     #[default]
     Quote,
     Words(usize),
+    Time(usize),
 }
 
 impl Mode {
@@ -38,6 +39,7 @@ impl Mode {
         match self {
             Mode::Quote => Data::get_random_quote(),
             Mode::Words(n) => Data::get_n_random_words(*n),
+            Mode::Time(n) => Data::get_n_random_words(*n * 2),
         }
     }
 }
