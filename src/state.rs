@@ -219,7 +219,7 @@ impl State {
             line!("Next <Tab>  Quit <Esc>"),
             line!("Select mode <Up/Down/Left/Right>"),
         ]
-        .fg(Color::Gray)
+        .fg(Color::DarkGray)
         .centered();
 
         let mut menu_area = area.centered_horizontally(Constraint::Length(text.width() as u16));
@@ -230,7 +230,7 @@ impl State {
 
     /// Renders the menu of keybinds at the bottom
     fn render_bottom_menu_end_screen(area: Rect, buf: &mut Buffer) {
-        let line = Line::raw("Next <Tab>  Quit <Esc/q>").fg(Color::Gray);
+        let line = Line::raw("Next <Tab>  Quit <Esc/q>").fg(Color::DarkGray);
         let mut menu_area = area.centered_horizontally(Constraint::Length(line.width() as u16));
         menu_area.y = area.bottom() - 2;
 
