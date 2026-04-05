@@ -6,6 +6,8 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
+/// The possible toast level
+/// The only thing this changes is the border color
 #[derive(Default, Debug)]
 pub enum ToastLevel {
     #[default]
@@ -16,6 +18,7 @@ pub enum ToastLevel {
 }
 
 impl ToastLevel {
+    /// Gets the border color based on self
     pub fn style(&self) -> Style {
         match self {
             Self::Info => Style::new().white(),
@@ -27,6 +30,7 @@ impl ToastLevel {
     }
 }
 
+/// A singular toast message
 #[derive(Default, Debug)]
 pub struct ToastMessage {
     pub level: ToastLevel,
@@ -34,24 +38,33 @@ pub struct ToastMessage {
 }
 
 impl ToastMessage {
+    /// New message with info level severity and the given message
     pub fn info(msg: String) -> Self {
         ToastMessage::default().level(ToastLevel::Info).msg(msg)
     }
+
+    /// New message with warning level severity and the given message
     pub fn warning(msg: String) -> Self {
         ToastMessage::default().level(ToastLevel::Warning).msg(msg)
     }
+
+    /// New message with error level severity and the given message
     pub fn error(msg: String) -> Self {
         ToastMessage::default().level(ToastLevel::Error).msg(msg)
     }
+
+    /// New message with success level severity and the given message
     pub fn success(msg: String) -> Self {
         ToastMessage::default().level(ToastLevel::Success).msg(msg)
     }
 
+    /// Returns the messsage with the given level set
     pub fn level(mut self, level: ToastLevel) -> Self {
         self.level = level;
         self
     }
 
+    /// Returns the messsage with the given msg set
     pub fn msg(mut self, msg: String) -> Self {
         self.msg = msg;
         self
@@ -59,9 +72,16 @@ impl ToastMessage {
 }
 
 pub struct Toast {
+    /// The array of messages
     pub messages: VecDeque<ToastMessage>,
+
+    /// Receiver of ToastAction
     pub rx: UnboundedReceiver<ToastAction>,
+
+    /// Sender of ToastAction
     tx: UnboundedSender<ToastAction>,
+
+    /// Sender of a ToastMessage
     toast_tx: UnboundedSender<ToastMessage>,
 }
 
@@ -72,6 +92,7 @@ pub enum ToastAction {
 }
 
 impl Toast {
+    /// A new toast manager with the given sender
     pub fn new(toast_tx: UnboundedSender<ToastMessage>) -> Toast {
         let (tx, rx) = mpsc::unbounded_channel();
         Toast {
@@ -82,6 +103,7 @@ impl Toast {
         }
     }
 
+    /// Listens for incoming Toast message and set a timeout to pop it after 3 seconds
     pub fn init(&self, mut toast_rx: UnboundedReceiver<ToastMessage>) -> JoinHandle<()> {
         let tx = self.tx.clone();
         tokio::spawn(async move {
@@ -97,6 +119,7 @@ impl Toast {
         })
     }
 
+    /// Convenient method to send message
     pub fn send(&self, msg: ToastMessage) -> color_eyre::Result<()> {
         self.toast_tx.send(msg)?;
 
