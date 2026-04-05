@@ -8,7 +8,7 @@ use tokio::time::sleep;
 
 /// The possible toast level
 /// The only thing this changes is the border color
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub enum ToastLevel {
     #[default]
     Info,
@@ -31,7 +31,7 @@ impl ToastLevel {
 }
 
 /// A singular toast message
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct ToastMessage {
     pub level: ToastLevel,
     pub msg: String,
@@ -76,7 +76,7 @@ pub struct Toast {
     pub messages: VecDeque<ToastMessage>,
 
     /// Receiver of ToastAction
-    pub rx: UnboundedReceiver<ToastAction>,
+    pub action_rx: UnboundedReceiver<ToastAction>,
 
     /// Sender of ToastAction
     tx: UnboundedSender<ToastAction>,
@@ -97,7 +97,7 @@ impl Toast {
         let (tx, rx) = mpsc::unbounded_channel();
         Toast {
             messages: VecDeque::new(),
-            rx,
+            action_rx: rx,
             tx,
             toast_tx,
         }
@@ -134,5 +134,86 @@ impl Toast {
                 self.messages.pop_back();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+
+    #[tokio::test]
+    async fn toast_messages() {
+        let (tx, rx) = mpsc::unbounded_channel::<ToastMessage>();
+
+        let mut toast = Toast::new(tx);
+        let handle = toast.init(rx);
+
+        toast.send(ToastMessage::info("First".to_string())).unwrap();
+
+        sleep(Duration::from_millis(100)).await;
+
+        toast
+            .send(ToastMessage::warning("Second".to_string()))
+            .unwrap();
+
+        sleep(Duration::from_millis(100)).await;
+
+        toast
+            .send(ToastMessage::success("Third".to_string()))
+            .unwrap();
+
+        sleep(Duration::from_millis(100)).await;
+
+        toast
+            .send(ToastMessage::error("Fourth".to_string()))
+            .unwrap();
+
+        sleep(Duration::from_millis(100)).await;
+
+        while let Ok(action) = toast.action_rx.try_recv() {
+            toast.handle_action(action);
+        }
+
+        assert_eq!(
+            toast.messages,
+            VecDeque::from([
+                ToastMessage::error("Fourth".to_string()),
+                ToastMessage::success("Third".to_string()),
+                ToastMessage::warning("Second".to_string()),
+                ToastMessage {
+                    level: ToastLevel::Info,
+                    msg: "First".to_string()
+                },
+            ])
+        );
+
+        sleep(Duration::from_millis(3000 - 400)).await;
+
+        while let Ok(action) = toast.action_rx.try_recv() {
+            toast.handle_action(action);
+        }
+
+        assert_eq!(
+            toast.messages,
+            VecDeque::from([
+                ToastMessage::error("Fourth".to_string()),
+                ToastMessage::success("Third".to_string()),
+                ToastMessage::warning("Second".to_string()),
+            ])
+        );
+
+        sleep(Duration::from_millis(400)).await;
+
+        while let Ok(action) = toast.action_rx.try_recv() {
+            toast.handle_action(action);
+        }
+
+        assert_eq!(toast.messages.len(), 0);
+
+        drop(toast);
+
+        handle.await.unwrap();
     }
 }
