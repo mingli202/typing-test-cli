@@ -125,4 +125,14 @@ impl Toast {
 
         Ok(())
     }
+
+    /// Handle incoming action
+    pub fn handle_action(&mut self, action: ToastAction) {
+        match action {
+            ToastAction::Push(msg) => self.messages.push_front(msg),
+            ToastAction::Pop => {
+                self.messages.pop_back();
+            }
+        }
+    }
 }

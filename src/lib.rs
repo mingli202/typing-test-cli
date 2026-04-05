@@ -120,12 +120,7 @@ impl App {
 
     fn handle_toast_action(&mut self) {
         if let Ok(action) = self.toast.rx.try_recv() {
-            match action {
-                ToastAction::Push(msg) => self.toast.messages.push_front(msg),
-                ToastAction::Pop => {
-                    self.toast.messages.pop_back();
-                }
-            }
+            self.toast.handle_action(action);
         }
     }
 }
