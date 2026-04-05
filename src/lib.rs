@@ -119,7 +119,7 @@ impl App {
     }
 
     fn handle_toast_action(&mut self) {
-        if let Ok(action) = self.toast.rx.try_recv() {
+        if let Ok(action) = self.toast.action_rx.try_recv() {
             self.toast.handle_action(action);
         }
     }
