@@ -10,7 +10,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use self::config::{Config, ConfigUpdate};
 use self::state::{Action, State};
-use self::toast::{Toast, ToastAction, ToastMessage};
+use self::toast::{Toast, ToastMessage};
 
 pub mod config;
 pub mod data;
