@@ -32,6 +32,24 @@ impl<T: Display> SelectionItem<T> {
         self.children = children;
         self
     }
+
+    /// Returns the first item satisfying the predicate p.
+    /// p takes the item and its id in the tree as argument
+    fn find<F: Fn(&T, usize) -> bool>(&self, p: &F) -> Option<&Self> {
+        if p(&self.item, self.id) {
+            return Some(self);
+        }
+
+        for child in &self.children {
+            let item = child.find(p);
+
+            if item.is_some() {
+                return item;
+            }
+        }
+
+        None
+    }
 }
 
 impl<T: Display> Selection<T> {
@@ -50,6 +68,8 @@ impl<T: Display> Selection<T> {
         }
     }
 
+    /// Traverse the tree to set the id of every item
+    /// The id is the order the given is discovered in a depth first search
     fn set_id(item: &mut SelectionItem<T>, id: usize, parent_id: Option<usize>) -> usize {
         item.parent_id = parent_id;
         item.id = id;
@@ -65,7 +85,32 @@ impl<T: Display> Selection<T> {
 
     /// Traverse the tree to select an item
     /// Will select the first item equal to the given item
-    pub fn select(&mut self, item: T) {}
+    /// If you need a prediate instead, see select_with
+    pub fn select(&mut self, item: T)
+    where
+        T: PartialEq,
+    {
+        self.select_with(|tree_item, _| *tree_item == item);
+    }
+
+    /// Traverse the tree to select the first item satisfying the predicate
+    /// Predicate takes the item as argument and it's id in the tree
+    /// If nothing matches, selected item is unchanged
+    pub fn select_with<F: Fn(&T, usize) -> bool>(&mut self, p: F) {
+        let mut found_item = None;
+
+        for item in &self.items {
+            found_item = item.find(&p);
+
+            if found_item.is_some() {
+                break;
+            }
+        }
+
+        if let Some(item) = found_item {
+            self.selected_id = item.id;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -140,5 +185,32 @@ mod selection_test {
         ];
 
         assert_eq!(selection.items, expected)
+    }
+
+    #[test]
+    pub fn selection() {
+        let items = vec![
+            SelectionItem::new(0).children(vec![
+                SelectionItem::new(0),
+                SelectionItem::new(1).children(vec![SelectionItem::new(1), SelectionItem::new(5)]),
+                SelectionItem::new(2),
+            ]),
+            SelectionItem::new(1),
+            SelectionItem::new(4),
+        ];
+
+        let mut selection = Selection::new(items);
+
+        selection.select(1);
+        assert_eq!(selection.selected_id, 2);
+
+        selection.select(5);
+        assert_eq!(selection.selected_id, 4);
+
+        selection.select_with(|item, _| *item == 4);
+        assert_eq!(selection.selected_id, 7);
+
+        selection.select(-1);
+        assert_eq!(selection.selected_id, 7);
     }
 }
