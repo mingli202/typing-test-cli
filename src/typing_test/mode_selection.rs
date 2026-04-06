@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use ratatui::style::{Color, Stylize};
-use ratatui::text::Span;
 use ratatui::widgets::Widget;
 
 use crate::selection::{Selection, SelectionItem};
