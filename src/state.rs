@@ -56,6 +56,7 @@ impl Mode {
 }
 
 pub struct State {
+    // (time, wpm)
     history: Vec<(f64, f64)>,
     mode: Mode,
     data: Data,
@@ -121,6 +122,11 @@ impl State {
                             if has_ended {
                                 let wpm = typing_test.net_wpm();
                                 let accuracy = typing_test.accuracy();
+
+                                if let Some(elapsed) = typing_test.elapsed_since_start_sec() {
+                                    self.history.push((elapsed.as_secs_f64(), wpm));
+                                }
+
                                 self.screen = Screen::new_end_screen(wpm, accuracy);
                             }
                         }
@@ -200,7 +206,6 @@ impl State {
                         if let Mode::Time(max_time) = self.mode
                             && elapsed > Duration::from_secs(max_time as u64)
                         {
-                            let wpm = typing_test.net_wpm();
                             let accuracy = typing_test.accuracy();
                             self.screen = Screen::new_end_screen(wpm, accuracy)
                         }
