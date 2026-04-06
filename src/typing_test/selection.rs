@@ -1,19 +1,20 @@
 use std::fmt::Display;
 
 #[derive(Debug)]
-pub struct Selection<T: Display> {
-    root: SelectionItem<T>,
+pub struct Selection<T> {
+    pub root: SelectionItem<T>,
     selected_path: Vec<usize>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct SelectionItem<T: Display> {
-    item: Option<T>,
-    children: Vec<SelectionItem<T>>,
+pub struct SelectionItem<T> {
+    /// Option because root node has technically nothing
+    pub item: Option<T>,
+    pub children: Vec<SelectionItem<T>>,
     last_selected_child_id: Option<usize>,
 }
 
-impl<T: Display> Default for SelectionItem<T> {
+impl<T> Default for SelectionItem<T> {
     fn default() -> Self {
         SelectionItem {
             item: None,
@@ -23,7 +24,7 @@ impl<T: Display> Default for SelectionItem<T> {
     }
 }
 
-impl<T: Display> SelectionItem<T> {
+impl<T> SelectionItem<T> {
     /// Makes a selection item
     pub fn new(item: T) -> Self {
         SelectionItem {
