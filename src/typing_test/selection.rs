@@ -227,5 +227,115 @@ mod selection_test {
     }
 
     #[test]
-    fn left() {}
+    fn left() {
+        let items = vec![
+            SelectionItem::new(0).children(vec![
+                SelectionItem::new(0),
+                SelectionItem::new(1).children(vec![SelectionItem::new(1), SelectionItem::new(5)]),
+                SelectionItem::new(2),
+            ]),
+            SelectionItem::new(1),
+            SelectionItem::new(4).children(vec![SelectionItem::new(6)]),
+        ];
+
+        let mut selection = Selection::new(items);
+
+        selection.select(1);
+
+        selection.left();
+        assert_eq!(selection.selected_path, vec![0, 0]);
+
+        selection.left();
+        assert_eq!(selection.selected_path, vec![0, 2]);
+
+        selection.left();
+        assert_eq!(selection.selected_path, vec![0, 1]);
+
+        selection.select(6);
+        selection.left();
+        assert_eq!(selection.selected_path, vec![2, 0]);
+    }
+
+    #[test]
+    fn right() {
+        let items = vec![
+            SelectionItem::new(0).children(vec![
+                SelectionItem::new(0),
+                SelectionItem::new(1).children(vec![SelectionItem::new(1), SelectionItem::new(5)]),
+                SelectionItem::new(2),
+            ]),
+            SelectionItem::new(1),
+            SelectionItem::new(4).children(vec![SelectionItem::new(6)]),
+        ];
+
+        let mut selection = Selection::new(items);
+
+        selection.select(1);
+
+        selection.right();
+        assert_eq!(selection.selected_path, vec![0, 2]);
+
+        selection.right();
+        assert_eq!(selection.selected_path, vec![0, 0]);
+
+        selection.right();
+        assert_eq!(selection.selected_path, vec![0, 1]);
+
+        selection.select(6);
+        selection.right();
+        assert_eq!(selection.selected_path, vec![2, 0]);
+    }
+
+    #[test]
+    fn up() {
+        let items = vec![
+            SelectionItem::new(0).children(vec![
+                SelectionItem::new(0),
+                SelectionItem::new(1).children(vec![SelectionItem::new(1), SelectionItem::new(5)]),
+                SelectionItem::new(2),
+            ]),
+            SelectionItem::new(1),
+            SelectionItem::new(4).children(vec![SelectionItem::new(6)]),
+        ];
+
+        let mut selection = Selection::new(items);
+
+        selection.select(5);
+
+        selection.up();
+        assert_eq!(selection.selected_path, vec![0, 1]);
+
+        selection.up();
+        assert_eq!(selection.selected_path, vec![0]);
+
+        selection.up();
+        assert_eq!(selection.selected_path, vec![0]);
+    }
+
+    #[test]
+    fn down() {
+        let items = vec![
+            SelectionItem::new(0).children(vec![
+                SelectionItem::new(0),
+                SelectionItem::new(1).children(vec![SelectionItem::new(1), SelectionItem::new(5)]),
+                SelectionItem::new(2),
+            ]),
+            SelectionItem::new(1),
+            SelectionItem::new(4).children(vec![SelectionItem::new(6)]),
+        ];
+
+        let mut selection = Selection::new(items);
+
+        selection.select(0);
+
+        selection.down();
+        assert_eq!(selection.selected_path, vec![0, 0]);
+
+        selection.down();
+        assert_eq!(selection.selected_path, vec![0, 0]);
+
+        selection.select(1);
+        selection.down();
+        assert_eq!(selection.selected_path, vec![0, 1, 0]);
+    }
 }
