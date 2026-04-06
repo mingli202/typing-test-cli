@@ -82,6 +82,7 @@ impl<T> Selection<T> {
         }
     }
 
+    /// Gets immutable reference to the internal element of the currently selected item
     pub fn get_selected_item(&self) -> Option<&T> {
         self.get_selected_selection_item()
             .and_then(|item| item.item.as_ref())
