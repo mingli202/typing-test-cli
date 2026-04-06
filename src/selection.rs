@@ -116,7 +116,7 @@ impl<T> Selection<T> {
     }
 
     /// Select the item left of the selected item.
-    /// Will look back to the end of the children.
+    /// Will loop back to the end of the children.
     pub fn left(&mut self) {
         if let Some(parent) = self.parent_of_selected()
             && !parent.children.is_empty()
@@ -138,7 +138,7 @@ impl<T> Selection<T> {
     }
 
     /// Select the item right of the selected item.
-    /// Will look back to the start of the children.
+    /// Will loop back to the start of the children.
     pub fn right(&mut self) {
         if let Some(parent) = self.parent_of_selected()
             && !parent.children.is_empty()
