@@ -197,8 +197,8 @@ impl State {
                     if let Some(elapsed) = elapsed {
                         self.history.push((elapsed.as_secs_f64(), wpm));
 
-                        if let Mode::Time(t) = self.mode
-                            && elapsed > Duration::from_secs(t as u64)
+                        if let Mode::Time(max_time) = self.mode
+                            && elapsed > Duration::from_secs(max_time as u64)
                         {
                             let wpm = typing_test.net_wpm();
                             let accuracy = typing_test.accuracy();
