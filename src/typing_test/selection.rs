@@ -72,7 +72,7 @@ impl<T: Display> Selection<T> {
         }
     }
 
-    /// Gets the currently selected item
+    /// Gets immutable reference to currently selected item
     pub fn get_selected_item(&self) -> Option<&SelectionItem<T>> {
         let mut selected = &self.root;
 
@@ -88,12 +88,32 @@ impl<T: Display> Selection<T> {
         Some(selected)
     }
 
+    /// Gets mutable reference to currently selected item
+    pub fn get_selected_item_mut(&mut self) -> Option<&mut SelectionItem<T>> {
+        let mut selected = &mut self.root;
+
+        for i in &self.selected_path {
+            match selected.children.get_mut(*i) {
+                Some(child) => selected = child,
+                None => {
+                    return None;
+                }
+            }
+        }
+
+        Some(selected)
+    }
+
     /// Move the selection up a level.
     /// It will select the parent of the current selected id.
     /// If there are no parent, the selected item is unchanged
     pub fn up(&mut self) {
         if self.selected_path.len() > 1 {
-            self.selected_path.pop();
+            let prev_index = self.selected_path.pop().unwrap();
+
+            if let Some(selected) = self.get_selected_item_mut() {
+                selected.last_selected_child_id = Some(prev_index);
+            }
         }
     }
 
@@ -337,5 +357,28 @@ mod selection_test {
         selection.select(1);
         selection.down();
         assert_eq!(selection.selected_path, vec![0, 1, 0]);
+    }
+
+    #[test]
+    fn up_down() {
+        let items = vec![
+            SelectionItem::new(0).children(vec![
+                SelectionItem::new(0),
+                SelectionItem::new(1).children(vec![SelectionItem::new(1), SelectionItem::new(5)]),
+                SelectionItem::new(2),
+            ]),
+            SelectionItem::new(1),
+            SelectionItem::new(4).children(vec![SelectionItem::new(6)]),
+        ];
+
+        let mut selection = Selection::new(items);
+
+        selection.select(1);
+
+        selection.up();
+        assert_eq!(selection.selected_path, vec![0]);
+
+        selection.down();
+        assert_eq!(selection.selected_path, vec![0, 1]);
     }
 }
