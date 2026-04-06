@@ -112,7 +112,3 @@ impl Widget for &ModeSelection {
         paragraph.render(area, buf);
     }
 }
-
-fn highlight(text: Span) -> Span {
-    text.fg(Color::Black).bg(Color::White)
-}
