@@ -46,7 +46,11 @@ impl Mode {
             //
             // NOTE: require refactor of current architecture or it will become messy
             // for now, just assume the user won't type more than 240 wpm
-            Mode::Time(t) => Data::get_n_random_words(t * 4),
+            Mode::Time(t) => {
+                let mut data = Data::get_n_random_words(t * 4);
+                data.source = format!("{} seconds", t);
+                data
+            }
         }
     }
 }
