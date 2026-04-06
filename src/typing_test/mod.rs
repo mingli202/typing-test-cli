@@ -93,43 +93,27 @@ impl TypingTest {
 
     /// Gets the numbers of wrong words
     pub fn n_wrongs(&self) -> usize {
-        self.words.iter().filter(|word| word.is_error()).count()
+        self.words[..=self.word_index]
+            .iter()
+            .filter(|word| word.is_error())
+            .count()
     }
 
     /// Gets the numbers of wrong words up to the current word the user is typing
     pub fn n_current_wrongs(&self) -> usize {
-        self.words[..self.word_index]
+        self.words[..=self.word_index]
             .iter()
             .filter(|word| word.is_error())
             .count()
-            + if self.words[self.word_index].letters[..self.letter_index]
-                .iter()
-                .any(|letter| letter.is_error())
-            {
-                1
-            } else {
-                0
-            }
-    }
-
-    /// Total number of letters typed excluding extras
-    pub fn total_letters_typed(&self) -> usize {
-        self.words
-            .iter()
-            .map(|word| word.n_letters_typed())
-            .sum::<usize>()
-            + self.words.len()
-            - 1
     }
 
     /// Total number of letters typed excluding extras up to the currently typed word
-    pub fn current_letters_typed(&self) -> usize {
-        self.words[..self.word_index]
+    pub fn letters_typed(&self) -> usize {
+        self.words[..=self.word_index]
             .iter()
             .map(|word| word.n_letters_typed())
             .sum::<usize>()
-            + self.word_index   // for spaces
-            + self.letter_index // for current word letters
+            + self.word_index // for spaces
     }
 
     /// Starts the typing test timer if it hasn't been started
@@ -141,40 +125,12 @@ impl TypingTest {
         self.time_started = Some(Instant::now());
     }
 
-    /// Gets the net WPM now since the starting time.
-    /// If it hasn't started, it's 0
-    pub fn net_wpm(&self) -> f64 {
-        let wpm = match self.elapsed_since_start_sec() {
-            Some(elapsed) => {
-                let final_typed_words =
-                    self.total_letters_typed() as f64 / 5.0 - self.n_wrongs() as f64;
-                60.0 * final_typed_words / elapsed.as_secs_f64()
-            }
-            None => 0.0,
-        };
-
-        if wpm < 0.0 { 0.0 } else { wpm }
-    }
-
-    /// Gets gross_wpm since the starting time
-    pub fn gross_wpm(&self) -> f64 {
-        let wpm = match self.elapsed_since_start_sec() {
-            Some(elapsed) => {
-                let final_typed_words = self.total_letters_typed() as f64 / 5.0;
-                60.0 * final_typed_words / elapsed.as_secs_f64()
-            }
-            None => 0.0,
-        };
-
-        if wpm < 0.0 { 0.0 } else { wpm }
-    }
-
     /// Gets the current wpm at the time called
-    pub fn current_net_wpm(&self) -> f64 {
+    pub fn net_wpm(&self) -> f64 {
         let wpm = match self.elapsed_since_start_sec() {
             Some(elapsed) if elapsed > Duration::from_secs(1) => {
                 let current_typed_words =
-                    self.current_letters_typed() as f64 / 5.0 - self.n_current_wrongs() as f64;
+                    self.letters_typed() as f64 / 5.0 - self.n_current_wrongs() as f64;
                 60.0 * current_typed_words / elapsed.as_secs_f64()
             }
             _ => 0.0,
@@ -293,8 +249,7 @@ impl TypingTest {
 
     /// Get total correct letters
     fn total_correct_letters_typed(&self) -> usize {
-        (self
-            .words
+        (self.words[..self.word_index]
             .iter()
             .map(|word| {
                 word.letters
@@ -309,8 +264,7 @@ impl TypingTest {
 
     /// The total amount of characters of this test.
     fn total_letters(&self) -> usize {
-        (self
-            .words
+        (self.words[..self.word_index]
             .iter()
             .map(|word| word.actual_len())
             .sum::<usize>()
@@ -651,7 +605,7 @@ mod typing_test_test {
             test.on_type(c);
         });
 
-        assert_eq!(test.total_letters_typed(), 10);
+        assert_eq!(test.letters_typed(), 10);
     }
 
     #[test]

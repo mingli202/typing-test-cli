@@ -184,7 +184,7 @@ impl State {
                 if typing_test.has_started()
                     && matches!(elapsed, Some(duration) if duration > Duration::from_secs(1))
                 {
-                    let wpm = typing_test.current_net_wpm();
+                    let wpm = typing_test.net_wpm();
 
                     if stats_last_updated_time.elapsed() > Duration::from_secs(1) {
                         stats.wpm = wpm;
