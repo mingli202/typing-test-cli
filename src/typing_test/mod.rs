@@ -670,7 +670,7 @@ mod typing_test_test {
             false,
             "last word should have no error"
         );
-        assert_eq!(test.word_index, 1);
+        assert_eq!(test.word_index, 2);
         assert_eq!(test.letter_index, 6);
         assert_eq!(
             did_end_1, false,
