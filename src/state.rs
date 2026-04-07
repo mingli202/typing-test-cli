@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::KeyEvent;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{Event, KeyCode};
+use ratatui::crossterm::event::KeyCode;
 use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect};
 use ratatui::macros::{line, text};
 use ratatui::style::{Color, Style, Stylize};

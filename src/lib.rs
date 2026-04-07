@@ -23,6 +23,14 @@ mod state;
 pub mod toast;
 mod typing_test;
 
+pub enum CustomEvent {
+    Quit,
+    Tick,
+    Render,
+    Key(KeyEvent),
+    Mouse(MouseEvent),
+}
+
 pub struct App {
     state: State,
     exit: bool,
@@ -147,14 +155,6 @@ impl App {
             self.toast.handle_action(action);
         }
     }
-}
-
-pub enum CustomEvent {
-    Quit,
-    Tick,
-    Render,
-    Key(KeyEvent),
-    Mouse(MouseEvent),
 }
 
 fn init_event_loop(event_tx: UnboundedSender<CustomEvent>, fps: usize, tps: usize) {
