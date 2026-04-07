@@ -1,3 +1,10 @@
+use std::io::{self, Stdout};
+
+use crossterm::cursor;
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+use ratatui::Terminal;
+use ratatui::prelude::CrosstermBackend;
 use tokio::sync::mpsc;
 use typing_test_tui::App;
 use typing_test_tui::config::Config;
@@ -26,11 +33,41 @@ async fn main() -> color_eyre::Result<()> {
 
     {
         let app = App::new(config_tx, toast).await;
-        ratatui::run(|terminal| app.run(terminal))?;
+
+        let mut term = setup_terminal()?;
+        app.run(&mut term)?;
+        teardown_terminal(&mut term)?;
     }
 
     toast_handle.await?;
     config_handle.await?;
 
+    Ok(())
+}
+
+fn setup_terminal() -> color_eyre::Result<Terminal<CrosstermBackend<Stdout>>> {
+    let mut stdout = io::stdout();
+    crossterm::terminal::enable_raw_mode()?;
+    crossterm::execute!(
+        stdout,
+        EnterAlternateScreen,
+        EnableMouseCapture,
+        cursor::Hide
+    )?;
+
+    let terminal = Terminal::new(CrosstermBackend::new(stdout))?;
+
+    Ok(terminal)
+}
+
+fn teardown_terminal(_terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> color_eyre::Result<()> {
+    let mut stdout = io::stdout();
+    crossterm::terminal::disable_raw_mode()?;
+    crossterm::execute!(
+        stdout,
+        LeaveAlternateScreen,
+        DisableMouseCapture,
+        cursor::Show
+    )?;
     Ok(())
 }
