@@ -59,7 +59,7 @@ fn setup_terminal() -> color_eyre::Result<Terminal<CrosstermBackend<Stdout>>> {
     crossterm::execute!(
         stdout,
         EnterAlternateScreen,
-        EnableMouseCapture,
+        // EnableMouseCapture,
         cursor::Hide
     )?;
 
@@ -74,7 +74,7 @@ fn teardown_terminal(_terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> colo
     crossterm::execute!(
         stdout,
         LeaveAlternateScreen,
-        DisableMouseCapture,
+        // DisableMouseCapture,
         cursor::Show
     )?;
     Ok(())

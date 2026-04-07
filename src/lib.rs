@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crossterm::event::{Event, EventStream, KeyEvent, KeyEventKind, MouseEvent};
+use crossterm::event::{Event, EventStream, KeyEvent, KeyEventKind};
 use futures::{FutureExt, StreamExt};
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::Rect;
@@ -28,7 +28,6 @@ pub enum CustomEvent {
     Tick,
     Render,
     Key(KeyEvent),
-    Mouse(MouseEvent),
 }
 
 pub struct App {
@@ -65,20 +64,25 @@ impl App {
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
         init_event_loop(event_tx, fps, tps);
 
-        while !self.exit
-            && let Some(custom_event) = event_rx.recv().await
-        {
-            match custom_event {
-                CustomEvent::Quit => self.exit = false,
-                CustomEvent::Tick => {
-                    let transition = self.state.on_tick();
-                    self.handle_transition(transition);
+        while !self.exit {
+            tokio::select! {
+                Some(custom_event) = event_rx.recv() => {
+                    match custom_event {
+                        CustomEvent::Quit => self.exit = false,
+                        CustomEvent::Tick => {
+                            let transition = self.state.on_tick();
+                            self.handle_transition(transition);
+                        }
+                        CustomEvent::Render => {
+                            terminal.draw(|frame| self.draw(frame))?;
+                        }
+                        CustomEvent::Key(key) => self.handle_key(key)?,
+                    }
+
                 }
-                CustomEvent::Render => {
-                    terminal.draw(|frame| self.draw(frame))?;
+                Some(toast_action) = self.toast.action_rx.recv() => {
+                    self.toast.handle_action(toast_action);
                 }
-                CustomEvent::Key(key) => self.handle_key(key)?,
-                CustomEvent::Mouse(_) => {}
             }
         }
 
@@ -149,12 +153,6 @@ impl App {
             }
         }
     }
-
-    fn handle_toast_action(&mut self) {
-        while let Ok(action) = self.toast.action_rx.try_recv() {
-            self.toast.handle_action(action);
-        }
-    }
 }
 
 fn init_event_loop(event_tx: UnboundedSender<CustomEvent>, fps: usize, tps: usize) {
@@ -180,7 +178,6 @@ fn init_event_loop(event_tx: UnboundedSender<CustomEvent>, fps: usize, tps: usiz
                         Some(Ok(e)) => {
                             match e {
                                 Event::Key(key_event) if key_event.kind == KeyEventKind::Press => CustomEvent::Key(key_event),
-                                Event::Mouse(mouse_event) => CustomEvent::Mouse(mouse_event),
                                 _ => continue,
                             }
                         }
