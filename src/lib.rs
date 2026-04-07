@@ -1,12 +1,16 @@
 use std::time::Duration;
 
-use ratatui::crossterm::event::{self, KeyCode, KeyModifiers};
+use crossterm::event::{Event, EventStream, KeyEvent, KeyEventKind, MouseEvent};
+use futures::{FutureExt, StreamExt};
+use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::Rect;
 use ratatui::macros::text;
 use ratatui::style::{Color, Stylize};
 use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
 use ratatui::{DefaultTerminal, Frame};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::select;
+use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::time::interval;
 
 use self::config::{Config, ConfigUpdate};
 use self::state::{Action, State};
@@ -44,12 +48,27 @@ impl App {
         }
     }
 
-    pub fn run(mut self, terminal: &mut DefaultTerminal) -> color_eyre::Result<()> {
-        while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
-            self.handle_toast_action();
+    pub async fn run(mut self, terminal: &mut DefaultTerminal) -> color_eyre::Result<()> {
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        init_event_loop(event_tx);
+
+        while !self.exit
+            && let Some(custom_event) = event_rx.recv().await
+        {
+            match custom_event {
+                CustomEvent::Quit => self.exit = false,
+                CustomEvent::Tick => {
+                    let transition = self.state.on_tick();
+                    self.handle_transition(transition);
+                }
+                CustomEvent::Render => {
+                    terminal.draw(|frame| self.draw(frame))?;
+                }
+                CustomEvent::Key(key) => self.handle_key(key)?,
+                CustomEvent::Mouse(_) => {}
+            }
         }
+
         Ok(())
     }
 
@@ -89,29 +108,20 @@ impl App {
         }
     }
 
-    fn handle_events(&mut self) -> color_eyre::Result<()> {
-        if event::poll(Duration::from_millis(250))?
-            && let Ok(event) = event::read()
+    fn handle_key(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
+        if let KeyEvent {
+            code: KeyCode::Esc, ..
+        }
+        | KeyEvent {
+            code: KeyCode::Char('c'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        } = key
         {
-            if let Some(
-                event::KeyEvent {
-                    code: KeyCode::Esc, ..
-                }
-                | event::KeyEvent {
-                    code: KeyCode::Char('c'),
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                },
-            ) = event.as_key_press_event()
-            {
-                self.exit = true
-            }
-
-            let transition = self.state.handle_events(event);
-            self.handle_transition(transition);
+            self.exit = true
         }
 
-        let transition = self.state.on_tick();
+        let transition = self.state.handle_key(key);
         self.handle_transition(transition);
 
         Ok(())
@@ -132,4 +142,52 @@ impl App {
             self.toast.handle_action(action);
         }
     }
+}
+
+pub enum CustomEvent {
+    Quit,
+    Tick,
+    Render,
+    Key(KeyEvent),
+    Mouse(MouseEvent),
+}
+
+fn init_event_loop(event_tx: UnboundedSender<CustomEvent>) {
+    tokio::spawn(async move {
+        let tick_duration_millis = 250;
+        let render_duration_millis = 1000 / 60;
+
+        let mut tick_interval = interval(Duration::from_millis(tick_duration_millis));
+        let mut render_interval = interval(Duration::from_millis(render_duration_millis));
+
+        let mut event_stream = EventStream::new();
+
+        loop {
+            select! {
+                _ = tick_interval.tick() => {
+                    let _ = event_tx.send(CustomEvent::Tick);
+                }
+                _ = render_interval.tick() => {
+                    let _ = event_tx.send(CustomEvent::Render);
+                }
+                maybe_event = event_stream.next().fuse() => {
+                    let custom_event = match maybe_event {
+                        Some(Ok(e)) => {
+                            match e {
+                                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => CustomEvent::Key(key_event),
+                                Event::Mouse(mouse_event) => CustomEvent::Mouse(mouse_event),
+                                _ => continue,
+                            }
+                        }
+                        Some(Err(_)) => continue,
+                        None => break,
+                    };
+
+                    if event_tx.send(custom_event).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    });
 }

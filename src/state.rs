@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+use crossterm::event::KeyEvent;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect};
@@ -104,7 +105,7 @@ impl State {
         }
     }
 
-    pub fn handle_events(&mut self, event: Event) -> Action {
+    pub fn handle_key(&mut self, key: KeyEvent) -> Action {
         let screen = &mut self.screen;
 
         match screen {
@@ -112,66 +113,60 @@ impl State {
                 typing_test,
                 selected_mode,
                 ..
-            } => {
-                if let Some(key) = event.as_key_press_event() {
-                    match key.code {
-                        KeyCode::Char(c) => {
-                            typing_test.start();
+            } => match key.code {
+                KeyCode::Char(c) => {
+                    typing_test.start();
 
-                            let has_ended = typing_test.on_type(c);
-                            if has_ended {
-                                let wpm = typing_test.net_wpm();
-                                let accuracy = typing_test.accuracy();
+                    let has_ended = typing_test.on_type(c);
+                    if has_ended {
+                        let wpm = typing_test.net_wpm();
+                        let accuracy = typing_test.accuracy();
 
-                                if let Some(elapsed) = typing_test.elapsed_since_start_sec() {
-                                    self.history.push((elapsed.as_secs_f64(), wpm));
-                                }
+                        if let Some(elapsed) = typing_test.elapsed_since_start_sec() {
+                            self.history.push((elapsed.as_secs_f64(), wpm));
+                        }
 
-                                self.screen = Screen::new_end_screen(wpm, accuracy);
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            typing_test.on_backspace();
-                        }
-                        KeyCode::Tab => {
-                            self.new_typing_test();
-                        }
-                        KeyCode::Left => {
-                            selected_mode.handle_left();
-                            let mode = selected_mode.selected_mode();
-                            return self.update_mode_if_different(mode);
-                        }
-                        KeyCode::Right => {
-                            selected_mode.handle_right();
-                            let mode = selected_mode.selected_mode();
-                            return self.update_mode_if_different(mode);
-                        }
-                        KeyCode::Up => {
-                            selected_mode.handle_up();
-                            let mode = selected_mode.selected_mode();
-                            return self.update_mode_if_different(mode);
-                        }
-                        KeyCode::Down => {
-                            selected_mode.handle_down();
-                            let mode = selected_mode.selected_mode();
-                            return self.update_mode_if_different(mode);
-                        }
-                        _ => {}
+                        self.screen = Screen::new_end_screen(wpm, accuracy);
                     }
                 }
-            }
-            Screen::EndScreenState { .. } => {
-                if let Some(key) = event.as_key_press_event() {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => {
-                            return Action::Quit;
-                        }
-                        KeyCode::Tab => {
-                            self.new_typing_test();
-                        }
-                        _ => (),
-                    };
+                KeyCode::Backspace => {
+                    typing_test.on_backspace();
                 }
+                KeyCode::Tab => {
+                    self.new_typing_test();
+                }
+                KeyCode::Left => {
+                    selected_mode.handle_left();
+                    let mode = selected_mode.selected_mode();
+                    return self.update_mode_if_different(mode);
+                }
+                KeyCode::Right => {
+                    selected_mode.handle_right();
+                    let mode = selected_mode.selected_mode();
+                    return self.update_mode_if_different(mode);
+                }
+                KeyCode::Up => {
+                    selected_mode.handle_up();
+                    let mode = selected_mode.selected_mode();
+                    return self.update_mode_if_different(mode);
+                }
+                KeyCode::Down => {
+                    selected_mode.handle_down();
+                    let mode = selected_mode.selected_mode();
+                    return self.update_mode_if_different(mode);
+                }
+                _ => {}
+            },
+            Screen::EndScreenState { .. } => {
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        return Action::Quit;
+                    }
+                    KeyCode::Tab => {
+                        self.new_typing_test();
+                    }
+                    _ => (),
+                };
             }
         };
 

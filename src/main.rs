@@ -35,7 +35,7 @@ async fn main() -> color_eyre::Result<()> {
         let app = App::new(config_tx, toast).await;
 
         let mut term = setup_terminal()?;
-        app.run(&mut term)?;
+        app.run(&mut term).await?;
         teardown_terminal(&mut term)?;
     }
 
