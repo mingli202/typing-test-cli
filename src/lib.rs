@@ -14,16 +14,20 @@ use tokio::time::interval;
 
 use self::action::Action;
 use self::config::{Config, ConfigUpdate};
-use self::state::State;
+use self::message::Message;
+use self::model::{AppModel, update};
 use self::toast::{Toast, ToastMessage};
 
 pub mod action;
 pub mod config;
 pub mod data;
+mod message;
+mod model;
 mod selection;
 mod state;
 pub mod toast;
 mod typing_test;
+mod view;
 
 pub enum CustomEvent {
     Quit,
@@ -33,10 +37,10 @@ pub enum CustomEvent {
 }
 
 pub struct App {
-    state: State,
     exit: bool,
     config_tx: UnboundedSender<ConfigUpdate>,
     toast: Toast,
+    model: AppModel,
 }
 
 impl App {
@@ -50,10 +54,10 @@ impl App {
         };
 
         App {
-            state: State::new(config.mode),
             exit: false,
             config_tx: tx,
             toast,
+            model: AppModel::new(config.mode),
         }
     }
 
@@ -67,26 +71,26 @@ impl App {
         init_event_loop(event_tx, fps, tps);
 
         while !self.exit {
-            let action = tokio::select! {
+            let actions: Vec<Action> = tokio::select! {
                 Some(custom_event) = event_rx.recv() => {
                     match custom_event {
-                        CustomEvent::Quit => Action::Quit,
-                        CustomEvent::Tick => self.state.on_tick(),
+                        CustomEvent::Quit => vec![Action::Quit],
+                        CustomEvent::Tick => vec![Action::Message(Message::Tick)],
                         CustomEvent::Render => {
                             terminal.draw(|frame| self.draw(frame))?;
-                            Action::None
+                            vec![]
                         }
-                        CustomEvent::Key(key) => self.handle_key(key)?,
+                        CustomEvent::Key(key) => self.handle_key(key),
                     }
 
                 }
                 Some(toast_action) = self.toast.action_rx.recv() => {
                     self.toast.handle_action(toast_action);
-                    Action::None
+                    vec![]
                 }
             };
 
-            self.handle_action(action);
+            self.handle_actions(actions);
         }
 
         Ok(())
@@ -94,7 +98,7 @@ impl App {
 
     fn draw(&self, frame: &mut Frame) {
         let area = frame.area();
-        frame.render_widget(&self.state, area);
+        // frame.render_widget(&self.state, area);
         self.draw_toast(frame);
     }
 
@@ -128,7 +132,7 @@ impl App {
         }
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> color_eyre::Result<Action> {
+    fn handle_key(&mut self, key: KeyEvent) -> Vec<Action> {
         if let KeyEvent {
             code: KeyCode::Esc, ..
         }
@@ -141,16 +145,20 @@ impl App {
             self.exit = true
         }
 
-        let action = self.state.handle_key(key);
-        Ok(action)
+        update(&mut self.model, Message::Key(key))
     }
 
-    fn handle_action(&mut self, transition: Action) {
-        match transition {
-            Action::Quit => self.exit = true,
-            Action::None => (),
-            Action::UpdateMode(mode) => {
-                let _ = self.config_tx.send(ConfigUpdate::Mode(mode));
+    fn handle_actions(&mut self, actions: Vec<Action>) {
+        for action in actions {
+            match action {
+                Action::Quit => self.exit = true,
+                Action::UpdateConfigMode(mode) => {
+                    let _ = self.config_tx.send(ConfigUpdate::Mode(mode));
+                }
+                Action::Message(msg) => {
+                    let actions = update(&mut self.model, msg);
+                    self.handle_actions(actions);
+                }
             }
         }
     }

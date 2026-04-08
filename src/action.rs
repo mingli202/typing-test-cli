@@ -1,7 +1,8 @@
-use crate::state::Mode;
+use crate::message::Message;
+use crate::model::Mode;
 
 pub enum Action {
-    None,
     Quit,
-    UpdateMode(Mode),
+    UpdateConfigMode(Mode),
+    Message(Message),
 }

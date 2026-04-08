@@ -11,7 +11,6 @@ use crate::typing_test::TypingTest;
 use crate::typing_test::mode_selection::ModeSelection;
 
 pub struct AppModel {
-    exit: bool,
     toast: Toast,
     config: Config,
     // (time, wpm)
@@ -21,7 +20,19 @@ pub struct AppModel {
     screen: Screen,
 }
 
-struct StateModel {}
+impl AppModel {
+    pub fn new(initial_mode: Mode) -> Self {
+        let data = initial_mode.get_data();
+        AppModel {
+            toast: Toast { messages: vec![] },
+            config: Config {},
+            history: vec![],
+            screen: Screen::new_typing_test(&data.text, initial_mode.clone()),
+            mode: initial_mode,
+            data,
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum Mode {
