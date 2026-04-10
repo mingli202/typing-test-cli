@@ -5,7 +5,7 @@ use tokio::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
-use crate::state::Mode;
+use crate::model::Mode;
 use crate::toast::ToastMessage;
 
 pub enum ConfigUpdate {

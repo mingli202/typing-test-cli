@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use ratatui::widgets::Widget;
 
+use crate::model::Mode;
 use crate::selection::{Selection, SelectionItem};
-use crate::state::Mode;
 
 #[derive(PartialEq, Clone)]
 pub enum ModeSelectionOption {

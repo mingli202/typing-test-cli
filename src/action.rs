@@ -1,8 +1,8 @@
-use crate::message::Message;
-use crate::model::Mode;
+use crate::model::{Mode, Screen};
+use crate::msg::Msg;
 
 pub enum Action {
     Quit,
     UpdateConfigMode(Mode),
-    Message(Message),
+    SwitchScreen(Screen),
 }
