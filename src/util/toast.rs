@@ -167,7 +167,7 @@ mod test {
     use super::*;
 
     use pretty_assertions::assert_eq;
-    use tokio::sync::Mutex;
+    use tokio::sync::{Mutex, mpsc};
 
     #[tokio::test]
     async fn toast_messages() {
