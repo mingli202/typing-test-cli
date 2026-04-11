@@ -2,24 +2,19 @@ use std::time::Duration;
 
 use crossterm::event::{Event, EventStream, KeyEvent, KeyEventKind};
 use futures::{FutureExt, StreamExt};
-use ratatui::crossterm::event::{KeyCode, KeyModifiers};
-use ratatui::layout::Rect;
-use ratatui::macros::text;
-use ratatui::style::{Color, Stylize};
-use ratatui::widgets::{Block, BorderType, Paragraph, Wrap};
-use ratatui::{DefaultTerminal, Frame};
+use ratatui::DefaultTerminal;
 use tokio::select;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::time::interval;
 
 use self::action::Action;
-use self::config::{Config, ConfigUpdate};
-use self::model::{AppModel, update, view};
+use self::model::{AppModel, handle_action, update, view};
 use self::msg::Msg;
 
 pub mod action;
 pub mod config;
 pub mod data;
+mod endscreen;
 mod model;
 mod msg;
 mod selection;
@@ -46,16 +41,20 @@ pub async fn run(terminal: &mut DefaultTerminal, fps: usize, tps: usize) -> colo
             Some(custom_event) = event_rx.recv() => {
                 match custom_event {
                     CustomEvent::Quit => Some(Action::Quit),
-                    CustomEvent::Tick => update(&mut app_model,Msg::Tick),
+                    CustomEvent::Tick => update(&mut app_model, Msg::Tick),
                     CustomEvent::Render => {
                         terminal.draw(|frame| view(&app_model, frame))?;
                         None
                     }
-                    CustomEvent::Key(key) => update(&mut app_model, Msg::Key(key)),
+                    CustomEvent::Key(key) => update(&mut app_model, Msg::Key(key.code)),
                 }
 
             }
         };
+
+        if let Some(action) = action {
+            handle_action(&mut app_model, action);
+        }
     }
 
     Ok(())

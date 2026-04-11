@@ -9,19 +9,25 @@ use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Widget, Wrap}
 
 use crate::action::Action;
 use crate::model::SharedModel;
-
-pub enum Msg {
-    Key(KeyCode),
-}
+use crate::msg::Msg;
 
 pub struct EndScreenModel {
     final_wpm: f64,
     accuracy: usize,
 }
 
+impl EndScreenModel {
+    pub fn new(final_wpm: f64, accuracy: usize) -> Self {
+        EndScreenModel {
+            final_wpm,
+            accuracy,
+        }
+    }
+}
+
 pub fn update(model: &mut EndScreenModel, msg: Msg) -> Option<Action> {
-    match msg {
-        Msg::Key(key) => match key {
+    if let Msg::Key(key) = msg {
+        match key {
             KeyCode::Char('q') | KeyCode::Esc => {
                 return Some(Action::Quit);
             }
@@ -29,7 +35,7 @@ pub fn update(model: &mut EndScreenModel, msg: Msg) -> Option<Action> {
                 // return Some(Action::SwitchScreen(()))
             }
             _ => (),
-        },
+        }
     }
 
     None

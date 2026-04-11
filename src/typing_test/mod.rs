@@ -1,9 +1,16 @@
 use std::time::{Duration, Instant};
 
 use crossterm::event::KeyCode;
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Offset, Rect};
+use ratatui::macros::{line, text};
+use ratatui::style::{Color, Stylize};
+use ratatui::widgets::Widget;
 
 use crate::action::Action;
-use crate::model::{Mode, SharedModel};
+use crate::endscreen::EndScreenModel;
+use crate::model::{Mode, Screen, SharedModel};
+use crate::msg::Msg;
 
 use self::mode_selection::ModeSelection;
 use self::typing::TypingTest;
@@ -12,11 +19,6 @@ mod letter;
 mod mode_selection;
 mod typing;
 mod word;
-
-pub enum Msg {
-    Key(KeyCode),
-    Tick,
-}
 
 #[derive(Debug, Default)]
 pub struct TypingStats {
@@ -70,12 +72,24 @@ pub fn update(
                     if let Some(elapsed) = typing_test.elapsed_since_start_sec() {
                         shared_model.history.push((elapsed.as_secs_f64(), wpm));
                     }
+
+                    return Some(Action::SwitchScreen(Screen::End(EndScreenModel::new(
+                        wpm, accuracy,
+                    ))));
                 }
             }
             KeyCode::Backspace => {
                 typing_test.on_backspace();
             }
-            KeyCode::Tab => {}
+            KeyCode::Tab => {
+                shared_model.history.clear();
+                shared_model.data = shared_model.mode.get_data();
+                let text = &shared_model.data.text;
+                return Some(Action::SwitchScreen(Screen::Typing(TypingModel::new(
+                    text,
+                    shared_model.mode.clone(),
+                ))));
+            }
             KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
                 if let Some(action) = handle_arrow_keys(selected_mode, &mut shared_model.mode, key)
                 {
@@ -126,12 +140,57 @@ fn handle_arrow_keys(
     None
 }
 
-pub fn view(
-    typing_model: &TypingModel,
-    area: ratatui::prelude::Rect,
-    buf: &mut ratatui::prelude::Buffer,
-) -> color_eyre::Result<()> {
-    typing::view_typing_test(&typing_model.typing_test, area, buf);
+pub fn view(typing_model: &TypingModel, shared_model: &SharedModel, area: Rect, buf: &mut Buffer) {
+    let typing_test_area = area.centered_vertically(Constraint::Length(3));
+    typing::view_typing_test(&typing_model.typing_test, typing_test_area, buf);
 
-    Ok(())
+    view_stats(
+        &typing_model.stats,
+        &shared_model.mode,
+        typing_model.typing_test.n_words(),
+        typing_test_area,
+        buf,
+    );
+
+    mode_selection::view_mode_selection(&typing_model.selected_mode, area, buf);
+    view_bottom_menu_typing(area, buf);
+}
+
+fn view_stats(
+    stats: &TypingStats,
+    mode: &Mode,
+    n_words: usize,
+    typing_test_area: Rect,
+    buf: &mut Buffer,
+) {
+    let stats_area = typing_test_area.offset(Offset { x: 0, y: -2 });
+    let wpm = stats.wpm;
+
+    let line = match mode {
+        Mode::Time(t) => {
+            let elapsed = stats.elapsed;
+            let remaining = u64::max(0, *t as u64 - elapsed.as_secs());
+            line![format!("{} {:.0}", remaining, wpm)]
+        }
+        _ => {
+            let cur_index = stats.current_index;
+            line![format!("{}/{} {:.0}", cur_index, n_words, wpm)]
+        }
+    };
+
+    line.render(stats_area, buf);
+}
+
+fn view_bottom_menu_typing(area: Rect, buf: &mut Buffer) {
+    let text = text![
+        line!("Next <Tab>  Quit <Esc>"),
+        line!("Select mode <Up/Down/Left/Right>"),
+    ]
+    .fg(Color::DarkGray)
+    .centered();
+
+    let mut menu_area = area.centered_horizontally(Constraint::Length(text.width() as u16));
+    menu_area.y = area.bottom() - text.height() as u16;
+
+    text.render(menu_area, buf);
 }

@@ -1,6 +1,6 @@
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 
 pub enum Msg {
     Tick,
-    Key(KeyEvent),
+    Key(KeyCode),
 }

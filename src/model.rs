@@ -1,11 +1,13 @@
 use ratatui::Frame;
+use ratatui::layout::Constraint;
 use serde::{Deserialize, Serialize};
 
 use crate::action::Action;
 use crate::data::Data;
+use crate::endscreen::{self, EndScreenModel};
 pub use crate::msg::Msg;
 use crate::toast::ToastMessage;
-use crate::typing_test::TypingModel;
+use crate::typing_test::{self, TypingModel};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum Mode {
@@ -43,7 +45,7 @@ struct Config {}
 
 pub enum Screen {
     Typing(TypingModel),
-    End,
+    End(EndScreenModel),
 }
 
 pub struct SharedModel {
@@ -78,7 +80,34 @@ impl AppModel {
 }
 
 pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
-    None
+    match &mut model.screen {
+        Screen::Typing(typing_model) => {
+            typing_test::update(typing_model, &mut model.shared_model, msg)
+        }
+        Screen::End(endscreen_model) => endscreen::update(endscreen_model, msg),
+    }
 }
 
-pub fn view(model: &AppModel, frame: &mut Frame) {}
+pub fn view(model: &AppModel, frame: &mut Frame) {
+    let area = frame.area();
+    let buf = frame.buffer_mut();
+
+    let area = area.centered_horizontally(Constraint::Max(80));
+
+    match &model.screen {
+        Screen::Typing(typing_model) => {
+            typing_test::view(typing_model, &model.shared_model, area, buf)
+        }
+        Screen::End(endscreen_model) => {
+            endscreen::view(endscreen_model, &model.shared_model, area, buf)
+        }
+    };
+}
+
+pub fn handle_action(model: &mut AppModel, action: Action) {
+    match action {
+        Action::Quit => model.exit = true,
+        Action::SwitchScreen(screen) => model.screen = screen,
+        _ => {}
+    };
+}
