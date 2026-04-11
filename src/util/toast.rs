@@ -163,81 +163,96 @@ pub fn view(toast: &Toast, area: Rect, buf: &mut Buffer) {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use super::*;
 
     use pretty_assertions::assert_eq;
+    use tokio::sync::Mutex;
 
     #[tokio::test]
     async fn toast_messages() {
-        let (tx, rx) = mpsc::unbounded_channel::<ToastMessage>();
+        let (tx, mut rx) = mpsc::unbounded_channel::<CustomEvent>();
+        let toast = Toast::new(tx);
 
-        let mut toast = Toast::new(tx);
-        let handle = toast.init(rx);
+        let toast = Arc::new(Mutex::new(toast));
+        let toast_clone = Arc::clone(&toast);
 
-        toast.send(ToastMessage::info("First".to_string())).unwrap();
+        tokio::spawn(async move {
+            while let Some(event) = rx.recv().await {
+                if let CustomEvent::ToastAction(action) = event {
+                    let mut lock = toast_clone.lock().await;
+                    lock.handle_action(action);
+                }
+            }
+        });
 
-        sleep(Duration::from_millis(100)).await;
-
-        toast
-            .send(ToastMessage::warning("Second".to_string()))
-            .unwrap();
-
-        sleep(Duration::from_millis(100)).await;
-
-        toast
-            .send(ToastMessage::success("Third".to_string()))
-            .unwrap();
-
-        sleep(Duration::from_millis(100)).await;
-
-        toast
-            .send(ToastMessage::error("Fourth".to_string()))
-            .unwrap();
-
-        sleep(Duration::from_millis(100)).await;
-
-        while let Ok(action) = toast.action_rx.try_recv() {
-            toast.handle_action(action);
+        {
+            let lock = toast.lock().await;
+            lock.send(ToastMessage::info("First".to_string())).unwrap();
         }
 
-        assert_eq!(
-            toast.messages,
-            VecDeque::from([
-                ToastMessage::error("Fourth".to_string()),
-                ToastMessage::success("Third".to_string()),
-                ToastMessage::warning("Second".to_string()),
-                ToastMessage {
-                    level: ToastLevel::Info,
-                    msg: "First".to_string()
-                },
-            ])
-        );
+        sleep(Duration::from_millis(100)).await;
+
+        {
+            let lock = toast.lock().await;
+            lock.send(ToastMessage::warning("Second".to_string()))
+                .unwrap();
+        }
+
+        sleep(Duration::from_millis(100)).await;
+
+        {
+            let lock = toast.lock().await;
+            lock.send(ToastMessage::success("Third".to_string()))
+                .unwrap();
+        }
+
+        sleep(Duration::from_millis(100)).await;
+
+        {
+            let lock = toast.lock().await;
+            lock.send(ToastMessage::error("Fourth".to_string()))
+                .unwrap();
+        }
+
+        sleep(Duration::from_millis(100)).await;
+
+        {
+            let lock = toast.lock().await;
+            assert_eq!(
+                lock.messages,
+                VecDeque::from([
+                    ToastMessage::error("Fourth".to_string()),
+                    ToastMessage::success("Third".to_string()),
+                    ToastMessage::warning("Second".to_string()),
+                    ToastMessage {
+                        level: ToastLevel::Info,
+                        msg: "First".to_string()
+                    },
+                ])
+            );
+        }
 
         sleep(Duration::from_millis(3000 - 400)).await;
 
-        while let Ok(action) = toast.action_rx.try_recv() {
-            toast.handle_action(action);
+        {
+            let lock = toast.lock().await;
+            assert_eq!(
+                lock.messages,
+                VecDeque::from([
+                    ToastMessage::error("Fourth".to_string()),
+                    ToastMessage::success("Third".to_string()),
+                    ToastMessage::warning("Second".to_string()),
+                ])
+            );
         }
-
-        assert_eq!(
-            toast.messages,
-            VecDeque::from([
-                ToastMessage::error("Fourth".to_string()),
-                ToastMessage::success("Third".to_string()),
-                ToastMessage::warning("Second".to_string()),
-            ])
-        );
 
         sleep(Duration::from_millis(400)).await;
 
-        while let Ok(action) = toast.action_rx.try_recv() {
-            toast.handle_action(action);
+        {
+            let lock = toast.lock().await;
+            assert_eq!(lock.messages.len(), 0);
         }
-
-        assert_eq!(toast.messages.len(), 0);
-
-        drop(toast);
-
-        handle.await.unwrap();
     }
 }
