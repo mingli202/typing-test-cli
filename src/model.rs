@@ -9,7 +9,7 @@ use crate::action::Action;
 use crate::data::Data;
 use crate::endscreen::{self, EndScreenModel};
 pub use crate::msg::Msg;
-use crate::typing_test::{self, TypingModel};
+use crate::typing::{self, TypingModel};
 use crate::util::config::Config;
 use crate::util::toast::{self, Toast};
 
@@ -108,9 +108,8 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
             }
 
             return match &mut model.screen {
-                Screen::Typing(typing_model) => typing_test::Msg::from(msg).and_then(|msg| {
-                    typing_test::update(typing_model, &mut model.shared_model, msg)
-                }),
+                Screen::Typing(typing_model) => typing::Msg::from(msg)
+                    .and_then(|msg| typing::update(typing_model, &mut model.shared_model, msg)),
                 Screen::End(_) => endscreen::Msg::from(msg)
                     .and_then(|msg| endscreen::update(&mut model.shared_model, msg)),
             };
@@ -128,7 +127,7 @@ pub fn view(model: &AppModel, frame: &mut Frame) {
 
     match &model.screen {
         Screen::Typing(typing_model) => {
-            typing_test::view(typing_model, &model.shared_model, centered, buf)
+            typing::view(typing_model, &model.shared_model, centered, buf)
         }
         Screen::End(endscreen_model) => {
             endscreen::view(endscreen_model, &model.shared_model, centered, buf)

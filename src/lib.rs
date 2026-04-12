@@ -18,8 +18,7 @@ pub mod data;
 mod endscreen;
 mod model;
 mod msg;
-mod state;
-mod typing_test;
+mod typing;
 mod util;
 
 pub enum CustomEvent {

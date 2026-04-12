@@ -1,6 +1,6 @@
 use crate::endscreen::EndScreenModel;
 use crate::model::{Mode, Screen, SharedModel};
-use crate::typing_test::TypingModel;
+use crate::typing::TypingModel;
 
 pub enum Action {
     Quit,

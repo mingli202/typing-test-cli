@@ -2,7 +2,7 @@ use crossterm::event::KeyEvent;
 
 use crate::util::config::ConfigUpdate;
 use crate::util::toast::ToastAction;
-use crate::{endscreen, typing_test};
+use crate::{endscreen, typing};
 
 pub enum Msg {
     Tick,
@@ -11,11 +11,11 @@ pub enum Msg {
     ConfigUpdate(ConfigUpdate),
 }
 
-impl typing_test::Msg {
-    pub fn from(msg: Msg) -> Option<typing_test::Msg> {
+impl typing::Msg {
+    pub fn from(msg: Msg) -> Option<typing::Msg> {
         match msg {
-            Msg::Tick => Some(typing_test::Msg::Tick),
-            Msg::Key(key_event) => Some(typing_test::Msg::Key(key_event.code)),
+            Msg::Tick => Some(typing::Msg::Tick),
+            Msg::Key(key_event) => Some(typing::Msg::Key(key_event.code)),
             _ => None,
         }
     }

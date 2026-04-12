@@ -11,7 +11,6 @@ use crate::action::Action;
 use crate::endscreen::EndScreenModel;
 use crate::model::{Mode, Screen, SharedModel};
 use crate::util::config::{self, ConfigUpdate};
-use crate::util::toast::{self, ToastMessage};
 
 use self::mode_selection::ModeSelection;
 use self::typing::TypingTest;
