@@ -10,7 +10,7 @@ use crate::data::Data;
 use crate::endscreen::{self, EndScreenModel};
 pub use crate::msg::Msg;
 use crate::typing::{self, TypingModel};
-use crate::util::config::Config;
+use crate::util::config::{Config, ConfigUpdate};
 use crate::util::toast::{self, Toast};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Default, Debug)]
@@ -89,9 +89,6 @@ impl AppModel {
 pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
     match msg {
         Msg::ToastAction(action) => model.toast.handle_action(action),
-        Msg::ConfigUpdate(config_update) => {
-            model.config.handle_config_update(config_update);
-        }
         _ => {
             if let Msg::Key(
                 KeyEvent {
@@ -137,10 +134,24 @@ pub fn view(model: &AppModel, frame: &mut Frame) {
     toast::view(&model.toast, area, buf);
 }
 
-pub fn handle_action(model: &mut AppModel, action: Action) {
+pub fn handle_action(model: &mut AppModel, action: Action) -> Option<Action> {
     match action {
         Action::Quit => model.exit = true,
         Action::SwitchScreen(screen) => model.screen = screen,
-        _ => {}
+        Action::ModeChange(mode) => {
+            model
+                .config
+                .handle_config_update(ConfigUpdate::Mode(mode.clone()));
+
+            if let Screen::Typing(typing_model) = &mut model.screen {
+                return typing::update(
+                    typing_model,
+                    &mut model.shared_model,
+                    typing::Msg::UpdateMode(mode),
+                );
+            }
+        }
     };
+
+    None
 }

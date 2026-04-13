@@ -4,7 +4,7 @@ use crate::typing::TypingModel;
 
 pub enum Action {
     Quit,
-    UpdateConfigMode(Mode),
+    ModeChange(Mode),
     SwitchScreen(Screen),
 }
 

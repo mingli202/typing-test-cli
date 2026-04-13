@@ -1,6 +1,5 @@
 use crossterm::event::KeyEvent;
 
-use crate::util::config::ConfigUpdate;
 use crate::util::toast::ToastAction;
 use crate::{endscreen, typing};
 
@@ -8,7 +7,6 @@ pub enum Msg {
     Tick,
     Key(KeyEvent),
     ToastAction(ToastAction),
-    ConfigUpdate(ConfigUpdate),
 }
 
 impl typing::Msg {

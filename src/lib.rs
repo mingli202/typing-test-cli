@@ -10,7 +10,6 @@ use tokio::time::interval;
 use self::action::Action;
 use self::model::{AppModel, handle_action, update, view};
 use self::msg::Msg;
-use self::util::config::ConfigUpdate;
 use self::util::toast::ToastAction;
 
 pub mod action;
@@ -27,7 +26,6 @@ pub enum CustomEvent {
     Render,
     Key(KeyEvent),
     ToastAction(ToastAction),
-    ConfigUpdate(ConfigUpdate),
 }
 
 pub async fn run(terminal: &mut DefaultTerminal, fps: usize, tps: usize) -> color_eyre::Result<()> {
@@ -37,7 +35,7 @@ pub async fn run(terminal: &mut DefaultTerminal, fps: usize, tps: usize) -> colo
     let mut app_model = AppModel::init(event_tx).await;
 
     while !app_model.exit {
-        let action: Option<Action> = tokio::select! {
+        let mut maybe_action: Option<Action> = tokio::select! {
             Some(custom_event) = event_rx.recv() => {
                 match custom_event {
                     CustomEvent::Quit => Some(Action::Quit),
@@ -48,15 +46,13 @@ pub async fn run(terminal: &mut DefaultTerminal, fps: usize, tps: usize) -> colo
                     }
                     CustomEvent::Key(key) => update(&mut app_model, Msg::Key(key)),
                     CustomEvent::ToastAction(action) => update(&mut app_model, Msg::ToastAction(action)),
-                    CustomEvent::ConfigUpdate(config_update) => update(&mut app_model, Msg::ConfigUpdate(config_update)),
-
                 }
 
             },
         };
 
-        if let Some(action) = action {
-            handle_action(&mut app_model, action);
+        while let Some(action) = maybe_action {
+            maybe_action = handle_action(&mut app_model, action);
         }
     }
 

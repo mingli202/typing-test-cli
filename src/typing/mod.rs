@@ -10,7 +10,6 @@ use ratatui::widgets::Widget;
 use crate::action::Action;
 use crate::endscreen::EndScreenModel;
 use crate::model::{Mode, Screen, SharedModel};
-use crate::util::config::{self, ConfigUpdate};
 
 use self::mode_selection::ModeSelection;
 use self::typing::TypingTest;
@@ -23,6 +22,7 @@ mod word;
 pub enum Msg {
     Tick,
     Key(KeyCode),
+    UpdateMode(Mode),
 }
 
 #[derive(Debug, Default)]
@@ -120,6 +120,10 @@ pub fn update(
                 stats.elapsed = elapsed
             }
         }
+        Msg::UpdateMode(new_mode) => {
+            shared_model.mode = new_mode.clone();
+            return Some(Action::new_typing_screen(shared_model));
+        }
     };
 
     None
@@ -128,7 +132,7 @@ pub fn update(
 /// Arrow keys change the current mode
 fn handle_arrow_keys(
     selected_mode: &mut ModeSelection,
-    shared_model: &mut SharedModel,
+    shared_model: &SharedModel,
     key: KeyCode,
 ) -> Option<Action> {
     match key {
@@ -151,14 +155,7 @@ fn handle_arrow_keys(
     if let Some(selected_mode) = selected_mode
         && selected_mode != shared_model.mode
     {
-        shared_model.mode = selected_mode.clone();
-
-        let _ = config::update(
-            &shared_model.event_tx,
-            ConfigUpdate::Mode(selected_mode.clone()),
-        );
-
-        return Some(Action::new_typing_screen(shared_model));
+        return Some(Action::ModeChange(selected_mode));
     }
 
     None

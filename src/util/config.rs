@@ -92,15 +92,6 @@ async fn load() -> color_eyre::Result<ConfigData, String> {
     }
 }
 
-pub fn update(
-    event_tx: &UnboundedSender<CustomEvent>,
-    update: ConfigUpdate,
-) -> color_eyre::Result<()> {
-    event_tx.send(CustomEvent::ConfigUpdate(update))?;
-
-    Ok(())
-}
-
 /// Gets the file as a PathBuf
 fn get_config_path() -> Option<PathBuf> {
     dirs::home_dir().map(|path| path.join(".typing-test-tui.toml"))
