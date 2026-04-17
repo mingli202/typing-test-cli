@@ -8,12 +8,13 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::time::interval;
 
 use self::action::Action;
+use self::args::Args;
 use self::model::{AppModel, handle_action, update, view};
 use self::msg::Msg;
 use self::util::toast::ToastAction;
 
 pub mod action;
-pub mod data;
+pub mod args;
 mod endscreen;
 mod model;
 mod msg;
@@ -28,11 +29,11 @@ pub enum CustomEvent {
     ToastAction(ToastAction),
 }
 
-pub async fn run(terminal: &mut DefaultTerminal, fps: usize, tps: usize) -> color_eyre::Result<()> {
+pub async fn run(terminal: &mut DefaultTerminal, args: Args) -> color_eyre::Result<()> {
     let (event_tx, mut event_rx) = mpsc::unbounded_channel();
-    init_event_loop(event_tx.clone(), fps, tps);
+    init_event_loop(event_tx.clone(), args.fps, args.tps);
 
-    let mut app_model = AppModel::init(event_tx).await;
+    let mut app_model = AppModel::new(event_tx, args.words_path, args.quotes_path).await?;
 
     while !app_model.exit {
         let mut maybe_action: Option<Action> = tokio::select! {

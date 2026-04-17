@@ -1,6 +1,7 @@
 use crate::endscreen::EndScreenModel;
 use crate::model::{Mode, Screen, SharedModel};
 use crate::typing::TypingModel;
+use crate::util::data_provider::DataProvider;
 
 pub enum Action {
     Quit,
@@ -9,9 +10,12 @@ pub enum Action {
 }
 
 impl Action {
-    pub fn new_typing_screen(shared_model: &mut SharedModel) -> Action {
+    pub fn new_typing_screen(
+        shared_model: &mut SharedModel,
+        data_provider: &DataProvider,
+    ) -> Action {
         shared_model.history.clear();
-        shared_model.data = shared_model.mode.get_data();
+        shared_model.data = data_provider.get_data_from_mode(&shared_model.mode);
         let text = &shared_model.data.text;
         Action::SwitchScreen(Screen::Typing(TypingModel::new(
             text,

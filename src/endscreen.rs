@@ -9,6 +9,7 @@ use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Widget, Wrap}
 
 use crate::action::Action;
 use crate::model::SharedModel;
+use crate::util::data_provider::DataProvider;
 
 pub enum Msg {
     Key(KeyCode),
@@ -28,15 +29,18 @@ impl EndScreenModel {
     }
 }
 
-pub fn update(shared_model: &mut SharedModel, msg: Msg) -> Option<Action> {
-    if let Msg::Key(key) = msg {
-        match key {
-            KeyCode::Char('q') | KeyCode::Esc => {
-                return Some(Action::Quit);
-            }
-            KeyCode::Tab => return Some(Action::new_typing_screen(shared_model)),
-            _ => (),
+pub fn update(
+    shared_model: &mut SharedModel,
+    data_provider: &DataProvider,
+    msg: Msg,
+) -> Option<Action> {
+    let Msg::Key(key) = msg;
+    match key {
+        KeyCode::Char('q') | KeyCode::Esc => {
+            return Some(Action::Quit);
         }
+        KeyCode::Tab => return Some(Action::new_typing_screen(shared_model, data_provider)),
+        _ => (),
     }
 
     None

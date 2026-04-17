@@ -6,11 +6,11 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::CustomEvent;
 use crate::action::Action;
-use crate::data::Data;
 use crate::endscreen::{self, EndScreenModel};
 pub use crate::msg::Msg;
 use crate::typing::{self, TypingModel};
 use crate::util::config::{Config, ConfigUpdate};
+use crate::util::data_provider::{Data, DataProvider};
 use crate::util::toast::{self, Toast};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Default, Debug)]
@@ -19,26 +19,6 @@ pub enum Mode {
     Quote,
     Words(usize),
     Time(usize),
-}
-
-impl Mode {
-    pub fn get_data(&self) -> Data {
-        match self {
-            Mode::Quote => Data::get_random_quote(),
-            Mode::Words(n) => Data::get_n_random_words(*n),
-            // TODO: new lines as the user reaches the end
-            // max 80 char per line -> ~16 words
-            // preload 4 lines
-            //
-            // NOTE: require refactor of current architecture or it will become messy
-            // for now, just assume the user won't type more than 240 wpm
-            Mode::Time(t) => {
-                let mut data = Data::get_n_random_words(t * 4);
-                data.source = format!("{} seconds", t);
-                data
-            }
-        }
-    }
 }
 
 pub enum Screen {
@@ -60,18 +40,24 @@ pub struct AppModel {
     config: Config,
     screen: Screen,
     shared_model: SharedModel,
+    data_provider: DataProvider,
 }
 
 impl AppModel {
-    pub async fn init(event_tx: UnboundedSender<CustomEvent>) -> Self {
+    pub async fn new(
+        event_tx: UnboundedSender<CustomEvent>,
+        words_path: Option<String>,
+        quotes_path: Option<String>,
+    ) -> color_eyre::Result<Self> {
         let config = Config::new(event_tx.clone()).await;
         let toast = Toast::new(event_tx.clone());
+        let data_provider = DataProvider::new(words_path, quotes_path)?;
 
         let initial_mode = config.data.mode.clone();
-        let data = initial_mode.get_data();
+        let data = data_provider.get_data_from_mode(&initial_mode);
         let text = &data.text;
 
-        AppModel {
+        Ok(AppModel {
             exit: false,
             screen: Screen::Typing(TypingModel::new(text, initial_mode.clone())),
             shared_model: SharedModel {
@@ -82,7 +68,8 @@ impl AppModel {
             },
             toast,
             config,
-        }
+            data_provider,
+        })
     }
 }
 
@@ -105,10 +92,17 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
             }
 
             return match &mut model.screen {
-                Screen::Typing(typing_model) => typing::Msg::from(msg)
-                    .and_then(|msg| typing::update(typing_model, &mut model.shared_model, msg)),
-                Screen::End(_) => endscreen::Msg::from(msg)
-                    .and_then(|msg| endscreen::update(&mut model.shared_model, msg)),
+                Screen::Typing(typing_model) => typing::Msg::from(msg).and_then(|msg| {
+                    typing::update(
+                        typing_model,
+                        &mut model.shared_model,
+                        &model.data_provider,
+                        msg,
+                    )
+                }),
+                Screen::End(_) => endscreen::Msg::from(msg).and_then(|msg| {
+                    endscreen::update(&mut model.shared_model, &model.data_provider, msg)
+                }),
             };
         }
     };
@@ -147,6 +141,7 @@ pub fn handle_action(model: &mut AppModel, action: Action) -> Option<Action> {
                 return typing::update(
                     typing_model,
                     &mut model.shared_model,
+                    &model.data_provider,
                     typing::Msg::UpdateMode(mode),
                 );
             }
