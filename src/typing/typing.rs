@@ -799,4 +799,42 @@ mod typing_test_test {
             "should not count untyped letters or extra letters"
         )
     }
+
+    #[test]
+    fn letters_typed_and_backspace() {
+        let mut test = TypingTest::new("Hello World!");
+
+        "Hel Worlasdf".chars().for_each(|c| {
+            test.on_type(c);
+        });
+
+        for _ in 0..3 {
+            test.on_backspace();
+        }
+
+        assert_eq!(
+            test.letters_typed(),
+            9,
+            "should not count untyped letters or extra letters"
+        );
+
+        for _ in 0..5 {
+            test.on_backspace();
+        }
+
+        assert_eq!(
+            test.letters_typed(),
+            4,
+            "should not count untyped letters or extra letters"
+        );
+
+        test.on_backspace();
+        test.on_backspace();
+
+        assert_eq!(
+            test.letters_typed(),
+            2,
+            "should not count untyped letters or extra letters"
+        );
+    }
 }
