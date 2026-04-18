@@ -14,9 +14,16 @@ async fn main() -> color_eyre::Result<()> {
 
     let args = Args::parse();
 
-    let mut term = setup_terminal()?;
-    run(&mut term, args).await?;
-    teardown_terminal(&mut term)?;
+    let res = {
+        let mut term = setup_terminal()?;
+        run(&mut term, args).await
+    };
+
+    teardown_terminal()?;
+
+    if let Err(e) = res {
+        eprintln!("Error while running tui: {}", e);
+    }
 
     Ok(())
 }
@@ -31,7 +38,7 @@ fn setup_terminal() -> color_eyre::Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(terminal)
 }
 
-fn teardown_terminal(_terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> color_eyre::Result<()> {
+fn teardown_terminal() -> color_eyre::Result<()> {
     let mut stdout = io::stdout();
     crossterm::terminal::disable_raw_mode()?;
     crossterm::execute!(stdout, LeaveAlternateScreen, cursor::Show)?;
