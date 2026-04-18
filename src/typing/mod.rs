@@ -194,7 +194,7 @@ fn view_stats(
     let line = match mode {
         Mode::Time(t) => {
             let elapsed = stats.elapsed;
-            let remaining = u64::max(0, *t as u64 - elapsed.as_secs());
+            let remaining = u64::max(0, (*t as u64).saturating_sub(elapsed.as_secs()));
             line![format!("{} {:.0}", remaining, wpm)]
         }
         _ => {
@@ -216,7 +216,7 @@ fn view_bottom_menu_typing(area: Rect, buf: &mut Buffer) {
     .centered();
 
     let mut menu_area = area.centered_horizontally(Constraint::Length(text.width() as u16));
-    menu_area.y = area.bottom() - text.height() as u16;
+    menu_area.y = area.bottom().saturating_sub(text.height() as u16);
 
     text.render(menu_area, buf);
 }
