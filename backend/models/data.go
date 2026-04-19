@@ -1,6 +1,6 @@
 package models
 
 type Data struct {
-	text   string
-	source string
+	Text   string
+	Source string
 }
