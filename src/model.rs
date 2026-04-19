@@ -17,7 +17,11 @@ use crate::util::toast::{self, Toast};
 pub enum Mode {
     #[default]
     Quote,
+
+    /// can only be either 10, 25, 50, or 100
     Words(usize),
+
+    /// can only be either 15, 30, 60, or 120 seconds
     Time(usize),
 }
 
