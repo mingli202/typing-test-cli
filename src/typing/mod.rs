@@ -116,6 +116,9 @@ pub fn update(
                 {
                     let accuracy = typing_test.accuracy();
                     let wpm = typing_test.net_wpm();
+
+                    shared_model.history.push((elapsed.as_secs_f64(), wpm));
+
                     return Some(Action::new_end_screen(wpm, accuracy));
                 }
 
