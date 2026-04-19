@@ -58,6 +58,13 @@ impl DataProvider {
     }
 
     pub fn get_n_random_words(&self, n: usize) -> Data {
+        if self.words.is_empty() {
+            return Data {
+                text: "No words found".to_string(),
+                source: "No words found".to_string(),
+            };
+        }
+
         let mut rng = rand::rng();
 
         let mut v = Vec::with_capacity(n);
