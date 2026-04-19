@@ -23,11 +23,11 @@ async fn main() -> color_eyre::Result<()> {
         eprintln!("Error tearing down terminal: {}", e);
     }
 
-    if let Err(e) = res {
+    if let Err(ref e) = res {
         eprintln!("Error while running tui: {}", e);
     }
 
-    Ok(())
+    res
 }
 
 fn setup_terminal() -> color_eyre::Result<Terminal<CrosstermBackend<Stdout>>> {
