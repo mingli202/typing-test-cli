@@ -216,6 +216,10 @@ impl TypingTest {
         let total_correct_letters = self.total_correct_letters_typed();
         let total_letters = self.total_letters();
 
+        if total_letters == 0 {
+            return 0;
+        }
+
         100 * total_correct_letters / total_letters
     }
 
