@@ -1,10 +1,13 @@
 package hub
 
 import (
+	"encoding/json"
 	"log"
 	"math/rand/v2"
 	"net/http"
+	"strconv"
 	"sync"
+	"tui/backend/models"
 
 	"github.com/gorilla/websocket"
 )
@@ -13,7 +16,52 @@ var upgrader = websocket.Upgrader{}
 
 type Hub struct {
 	mu     sync.Mutex
-	groups map[string][]*websocket.Conn
+	groups map[string]map[*websocket.Conn]bool
+}
+
+// Handles websocket message
+// Maps the message function to its own function (the client "calls" a function on the hub)
+func (hub *Hub) HandleMessage(p []byte, conn *websocket.Conn) string {
+	readMessage := models.ReadMessage{}
+
+	err := json.Unmarshal(p, &readMessage)
+
+	if err != nil {
+		return err.Error()
+	}
+
+	switch readMessage.Function {
+	case "NewGroup":
+		id := hub.NewGroup(conn)
+		return id
+	case "Join":
+		joinGroup := models.JoinGroup{}
+		err = json.Unmarshal([]byte(readMessage.Payload), &joinGroup)
+		if err != nil {
+			return err.Error()
+		}
+
+		success := hub.Join(joinGroup.Id, conn)
+		return strconv.FormatBool(success)
+
+	case "Exit":
+		exitGroup := models.ExitGroup{}
+		err = json.Unmarshal([]byte(readMessage.Payload), &exitGroup)
+
+		if err != nil {
+			return err.Error()
+		}
+
+		success := hub.Exit(exitGroup.Id, conn)
+
+		return strconv.FormatBool(success)
+	}
+
+	if err != nil {
+		return err.Error()
+	}
+
+	return ""
 }
 
 // Makes a new group with the given conn
@@ -30,13 +78,40 @@ func (hub *Hub) NewGroup(conn *websocket.Conn) string {
 		_, ok = hub.groups[id]
 	}
 
-	hub.groups[id] = make([]*websocket.Conn, 1)
-	hub.groups[id] = append(hub.groups[id], conn)
+	hub.groups[id] = make(map[*websocket.Conn]bool)
+	hub.groups[id][conn] = true
 
 	return id
 }
 
-func (hub *Hub) Join(id string, conn *websocket.Conn) {
+// Appends the given conn to the group with the given id
+// Return whether the conn was added to the group
+func (hub *Hub) Join(id string, conn *websocket.Conn) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	group, ok := hub.groups[id]
+
+	if ok {
+		group[conn] = true
+	}
+
+	return ok
+}
+
+// Removes the given conn from the group with the given id
+// Returns whether the remove was successful or not
+func (hub *Hub) Exit(id string, conn *websocket.Conn) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	group, ok := hub.groups[id]
+
+	if ok {
+		delete(group, conn)
+	}
+
+	return ok
 }
 
 func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,13 +127,23 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for {
-		_, p, err := conn.ReadMessage()
-
-		log.Println(string(p))
+		messageType, p, err := conn.ReadMessage()
 
 		if err != nil {
 			log.Println(err)
 			return
+		}
+
+		if messageType != websocket.TextMessage {
+			continue
+		}
+
+		returnMessage := hub.HandleMessage(p, conn)
+
+		err = conn.WriteMessage(websocket.TextMessage, []byte(returnMessage))
+
+		if err != nil {
+			log.Println(err)
 		}
 	}
 }

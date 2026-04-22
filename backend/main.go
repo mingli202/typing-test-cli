@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"tui/backend/handlers/hub"
 )
 
 const port = 8080
@@ -17,10 +18,7 @@ const port = 8080
 func main() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		fmt.Fprintf(w, "Ready at %v!\n", ctx.Value("serverAddr"))
-	})
+	registerRoutes(mux)
 
 	ctx := context.Background()
 
@@ -56,4 +54,12 @@ func main() {
 	}
 
 	log.Println("Server stopped")
+}
+
+func registerRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		fmt.Fprintf(w, "Ready at %v!\n", ctx.Value("serverAddr"))
+	})
+	mux.Handle("/ws", hub.Handler())
 }
