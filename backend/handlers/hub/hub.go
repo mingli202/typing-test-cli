@@ -8,60 +8,83 @@ import (
 	"sync"
 	"tui/backend/models"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{}
 
-type Hub struct {
-	mu     sync.Mutex
-	groups map[string]map[*websocket.Conn]bool
+type User struct {
+	conn    *websocket.Conn
+	id      string
+	groupId *string
 }
 
-// Handles websocket message
-// Maps the message function to its own function (the client "calls" a function on the hub)
-func (hub *Hub) HandleMessage(p []byte, conn *websocket.Conn) ([]byte, error) {
-	readMessage := models.ReadMessage{}
+type Group struct {
+	id    string
+	users map[string]bool
+}
 
-	err := json.Unmarshal(p, &readMessage)
+// Makes a new group with the given id
+func NewGroup(id string) Group {
+	return Group{
+		id:    id,
+		users: make(map[string]bool),
+	}
+}
 
-	if err != nil {
-		return []byte{}, err
+// Adds the given user to this group
+func (group *Group) AddUser(user *User) {
+	group.users[user.id] = true
+	user.groupId = &group.id
+}
+
+// Removes the given user to this group
+func (group *Group) RemoveUser(user *User) {
+	delete(group.users, user.id)
+	user.groupId = nil
+}
+
+type Hub struct {
+	mu     sync.Mutex
+	groups map[string]Group
+	users  map[string]User
+}
+
+// Returns a new user
+func (hub *Hub) NewUser(conn *websocket.Conn) *User {
+	user := User{
+		conn:    conn,
+		id:      uuid.NewString(),
+		groupId: nil,
 	}
 
-	switch readMessage.Type {
-	case "NewGroup":
-		id := hub.NewGroup(conn)
-		return json.Marshal(models.NewGroupResponse{Id: id})
-	case "Join":
-		joinGroup := models.JoinGroup{}
-		err = json.Unmarshal([]byte(readMessage.Payload), &joinGroup)
-		if err != nil {
-			return []byte{}, err
-		}
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
 
-		success := hub.Join(joinGroup.Id, conn)
-		return json.Marshal(models.JoinResponse{Success: success})
+	_, ok := hub.users[user.id]
 
-	case "Exit":
-		exitGroup := models.ExitGroup{}
-		err = json.Unmarshal([]byte(readMessage.Payload), &exitGroup)
-
-		if err != nil {
-			return []byte{}, err
-		}
-
-		success := hub.Exit(exitGroup.Id, conn)
-
-		return json.Marshal(models.JoinResponse{Success: success})
-	default:
-		return []byte{}, TypeNotFoundError{}
+	for ok {
+		user.id = uuid.NewString()
+		_, ok = hub.users[user.id]
 	}
+
+	hub.users[user.id] = user
+
+	return &user
+}
+
+// Removes the given user
+func (hub *Hub) RemoveUser(user *User) {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	delete(hub.users, user.id)
 }
 
 // Makes a new group with the given conn
 // Returns the newly created group id
-func (hub *Hub) NewGroup(conn *websocket.Conn) string {
+func (hub *Hub) NewGroup(user *User) string {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
@@ -73,22 +96,25 @@ func (hub *Hub) NewGroup(conn *websocket.Conn) string {
 		_, ok = hub.groups[id]
 	}
 
-	hub.groups[id] = make(map[*websocket.Conn]bool)
-	hub.groups[id][conn] = true
+	group := NewGroup(id)
+	hub.groups[group.id] = group
+
+	group.AddUser(user)
 
 	return id
 }
 
 // Appends the given conn to the group with the given id
 // Return whether the conn was added to the group
-func (hub *Hub) Join(id string, conn *websocket.Conn) bool {
+func (hub *Hub) Join(groupId string, user *User) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	group, ok := hub.groups[id]
+	group, ok := hub.groups[groupId]
 
 	if ok {
-		group[conn] = true
+		group.RemoveUser(user)
+		group.AddUser(user)
 	}
 
 	return ok
@@ -96,17 +122,58 @@ func (hub *Hub) Join(id string, conn *websocket.Conn) bool {
 
 // Removes the given conn from the group with the given id
 // Returns whether the remove was successful or not
-func (hub *Hub) Exit(id string, conn *websocket.Conn) bool {
+func (hub *Hub) Exit(id string, user *User) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
 	group, ok := hub.groups[id]
 
 	if ok {
-		delete(group, conn)
+		group.RemoveUser(user)
 	}
 
 	return ok
+}
+
+// Handles websocket message
+// Maps the message function to its own function (the client "calls" a function on the hub)
+func (hub *Hub) HandleMessage(p []byte, user *User) ([]byte, error) {
+	readMessage := models.ReadMessage{}
+
+	err := json.Unmarshal(p, &readMessage)
+
+	if err != nil {
+		return []byte{}, err
+	}
+
+	switch readMessage.Type {
+	case "NewGroup":
+		id := hub.NewGroup(user)
+		return json.Marshal(models.NewGroupResponse{Id: id})
+	case "Join":
+		joinGroup := models.JoinGroup{}
+		err = json.Unmarshal([]byte(readMessage.Payload), &joinGroup)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		success := hub.Join(joinGroup.Id, user)
+		return json.Marshal(models.JoinResponse{Success: success})
+
+	case "Exit":
+		exitGroup := models.ExitGroup{}
+		err = json.Unmarshal([]byte(readMessage.Payload), &exitGroup)
+
+		if err != nil {
+			return []byte{}, err
+		}
+
+		success := hub.Exit(exitGroup.Id, user)
+
+		return json.Marshal(models.JoinResponse{Success: success})
+	default:
+		return []byte{}, TypeNotFoundError{}
+	}
 }
 
 func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +184,10 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := hub.NewUser(conn)
+
 	defer func() {
+		hub.RemoveUser(user)
 		conn.Close()
 	}()
 
@@ -133,7 +203,7 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		returnMessage, err := hub.HandleMessage(p, conn)
+		returnMessage, err := hub.HandleMessage(p, user)
 
 		if err != nil {
 			errBytes, errErr := json.Marshal(err)
