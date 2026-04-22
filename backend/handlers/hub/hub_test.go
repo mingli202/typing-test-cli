@@ -19,3 +19,21 @@ func TestNewGroupId(t *testing.T) {
 	fmt.Printf("groupId: %+v\n", groupId)
 	fmt.Printf("anotherGroupId: %+v\n", anotherGroupId)
 }
+
+func TestNewUser(t *testing.T) {
+	hub := Hub{}
+
+	user1 := hub.NewUser(nil)
+
+	if len(hub.groups) != 0 {
+		t.Errorf("How could a group been made?")
+	}
+
+	if len(hub.users) != 1 {
+		t.Errorf("Should have added a new user")
+	}
+
+	if user1.groupId != nil {
+		t.Errorf("User should not belong in any group for now")
+	}
+}
