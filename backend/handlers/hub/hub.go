@@ -51,7 +51,15 @@ type Hub struct {
 	users  map[string]User
 }
 
-// Returns a new user
+func NewHub() Hub {
+	return Hub{
+		groups: make(map[string]Group),
+		users:  make(map[string]User),
+	}
+}
+
+// Adds a user to its user repository
+// and returns the newly added user
 func (hub *Hub) NewUser(conn *websocket.Conn) *User {
 	user := User{
 		conn:    conn,
