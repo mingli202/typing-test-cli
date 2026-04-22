@@ -5,7 +5,6 @@ import (
 	"log"
 	"math/rand/v2"
 	"net/http"
-	"strconv"
 	"sync"
 	"tui/backend/models"
 
@@ -21,47 +20,43 @@ type Hub struct {
 
 // Handles websocket message
 // Maps the message function to its own function (the client "calls" a function on the hub)
-func (hub *Hub) HandleMessage(p []byte, conn *websocket.Conn) string {
+func (hub *Hub) HandleMessage(p []byte, conn *websocket.Conn) ([]byte, error) {
 	readMessage := models.ReadMessage{}
 
 	err := json.Unmarshal(p, &readMessage)
 
 	if err != nil {
-		return err.Error()
+		return []byte{}, err
 	}
 
-	switch readMessage.Function {
+	switch readMessage.Type {
 	case "NewGroup":
 		id := hub.NewGroup(conn)
-		return id
+		return json.Marshal(models.NewGroupResponse{Id: id})
 	case "Join":
 		joinGroup := models.JoinGroup{}
 		err = json.Unmarshal([]byte(readMessage.Payload), &joinGroup)
 		if err != nil {
-			return err.Error()
+			return []byte{}, err
 		}
 
 		success := hub.Join(joinGroup.Id, conn)
-		return strconv.FormatBool(success)
+		return json.Marshal(models.JoinResponse{Success: success})
 
 	case "Exit":
 		exitGroup := models.ExitGroup{}
 		err = json.Unmarshal([]byte(readMessage.Payload), &exitGroup)
 
 		if err != nil {
-			return err.Error()
+			return []byte{}, err
 		}
 
 		success := hub.Exit(exitGroup.Id, conn)
 
-		return strconv.FormatBool(success)
+		return json.Marshal(models.JoinResponse{Success: success})
+	default:
+		return []byte{}, TypeNotFoundError{}
 	}
-
-	if err != nil {
-		return err.Error()
-	}
-
-	return ""
 }
 
 // Makes a new group with the given conn
@@ -138,9 +133,18 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		returnMessage := hub.HandleMessage(p, conn)
+		returnMessage, err := hub.HandleMessage(p, conn)
 
-		err = conn.WriteMessage(websocket.TextMessage, []byte(returnMessage))
+		if err != nil {
+			errBytes, errErr := json.Marshal(err)
+
+			if errErr == nil {
+				err = conn.WriteMessage(websocket.TextMessage, errBytes)
+			}
+
+		} else {
+			err = conn.WriteMessage(websocket.TextMessage, []byte(returnMessage))
+		}
 
 		if err != nil {
 			log.Println(err)

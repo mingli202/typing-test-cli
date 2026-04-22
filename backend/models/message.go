@@ -1,8 +1,8 @@
 package models
 
 type ReadMessage struct {
-	Function string
-	Payload  string
+	Type    string
+	Payload string
 }
 
 type JoinGroup struct {
@@ -14,5 +14,18 @@ type ExitGroup struct {
 }
 
 type WriteMessage struct {
-	Type string
+	Type    string
+	Payload string
+}
+
+type NewGroupResponse struct {
+	Id string
+}
+
+type JoinResponse struct {
+	Success bool
+}
+
+type ExitResponse struct {
+	Success bool
 }
