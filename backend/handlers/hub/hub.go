@@ -200,11 +200,11 @@ Returns a response message and error.
 
 All Functions:
 
-- NewGroup
+- NewGroup -> <NewlyJoinedGroupId>
 
-- JoinGroup <Id>
+- JoinGroup <Id> -> <DidSucceed>
 
-- LeaveGroup
+- LeaveGroup -> <DidSucceed>
 */
 func (hub *Hub) handleMessage(p []byte, user *User) (string, error) {
 	msg := string(p)
