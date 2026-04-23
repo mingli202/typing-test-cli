@@ -2,10 +2,12 @@ package hub
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand/v2"
 	"net/http"
 	"sync"
+	"time"
 	"tui/backend/models"
 
 	"github.com/google/uuid"
@@ -197,6 +199,8 @@ func (hub *Hub) handleMessage(p []byte, user *User) ([]byte, error) {
 		return []byte{}, err
 	}
 
+	log.Println(readMessage)
+
 	switch readMessage.Type {
 	case "NewGroup":
 		id := hub.handleNewGroup(user)
@@ -239,8 +243,11 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	user := hub.newUser(conn)
 
+	log.Printf("New user connected: %v\n", user)
+
 	defer func() {
 		hub.removeUser(user)
+		log.Printf("User disconnected: %v\n", user)
 	}()
 
 	for {
@@ -258,7 +265,8 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		returnMessage, err := hub.handleMessage(p, user)
 
 		if err != nil {
-			errBytes, errErr := json.Marshal(err)
+			errorMsg := models.ErrorResponse{Error: err.Error()}
+			errBytes, errErr := json.Marshal(errorMsg)
 
 			if errErr == nil {
 				err = conn.WriteMessage(websocket.TextMessage, errBytes)
@@ -274,8 +282,26 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (hub *Hub) String() string {
+	return fmt.Sprintf("Hub {\n    groups: %+v\n    user: %+v\n}", hub.groups, hub.users)
+}
+
 func Handler() http.Handler {
 	hub := newHub()
+
+	ticker := time.NewTicker(5 * time.Second)
+
+	go func() {
+		for {
+			_, ok := <-ticker.C
+
+			if !ok {
+				break
+			}
+
+			log.Printf(hub.String())
+		}
+	}()
 
 	return &hub
 }

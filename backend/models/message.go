@@ -29,3 +29,7 @@ type JoinResponseGroup struct {
 type LeaveGroupResponse struct {
 	Success bool
 }
+
+type ErrorResponse struct {
+	Error string
+}
