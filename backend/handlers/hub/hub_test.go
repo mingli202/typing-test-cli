@@ -98,8 +98,19 @@ func TestJoin(t *testing.T) {
 	groupId1 := hub.handleNewGroup(user1)
 	group1 := hub.groups[groupId1]
 
+	// user joins itself
+	ok := hub.handleJoin(groupId1, user1)
+
+	if !ok {
+		t.Fatal("Technically the user can in fact join its own group")
+	}
+
+	if _, ok = hub.groups[groupId1]; !ok {
+		t.Fatal("Where is the group??")
+	}
+
 	// user 2 joins valid group
-	ok := hub.handleJoin(groupId1, user2)
+	ok = hub.handleJoin(groupId1, user2)
 
 	if !ok {
 		t.Fatalf("Join unsuccessful")

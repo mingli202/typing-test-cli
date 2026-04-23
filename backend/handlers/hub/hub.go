@@ -148,6 +148,10 @@ func (hub *Hub) join(groupId string, user *User) bool {
 	group, ok := hub.groups[groupId]
 
 	if ok {
+		if user.groupId != nil && groupId == *user.groupId {
+			return true
+		}
+
 		hub.leave(user)
 		group.addUser(user)
 	}
