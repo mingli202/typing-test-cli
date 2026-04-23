@@ -9,7 +9,7 @@ type JoinGroup struct {
 	Id string
 }
 
-type ExitGroup struct {
+type LeaveGroup struct {
 	Id string
 }
 

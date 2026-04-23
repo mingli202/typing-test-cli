@@ -26,7 +26,7 @@ type Group struct {
 }
 
 // Makes a new group with the given id
-func NewGroup(id string) Group {
+func newGroup(id string) Group {
 	return Group{
 		id:    id,
 		users: make(map[string]bool),
@@ -34,14 +34,14 @@ func NewGroup(id string) Group {
 }
 
 // Adds the given user to this group
-func (group *Group) AddUser(user *User) {
+func (group *Group) addUser(user *User) {
 	group.users[user.id] = true
 	user.groupId = &group.id
 }
 
 // Removes the given user to this group
 // Returns whether this group is empty
-func (group *Group) RemoveUser(user *User) bool {
+func (group *Group) removeUser(user *User) bool {
 	delete(group.users, user.id)
 	user.groupId = nil
 
@@ -55,7 +55,7 @@ type Hub struct {
 }
 
 // Makes a new hub
-func NewHub() Hub {
+func newHub() Hub {
 	return Hub{
 		groups: make(map[string]Group),
 		users:  make(map[string]User),
@@ -64,7 +64,7 @@ func NewHub() Hub {
 
 // Adds a user to its user repository
 // and returns the newly added user
-func (hub *Hub) NewUser(conn *websocket.Conn) *User {
+func (hub *Hub) newUser(conn *websocket.Conn) *User {
 	user := User{
 		conn:    conn,
 		id:      uuid.NewString(),
@@ -86,11 +86,17 @@ func (hub *Hub) NewUser(conn *websocket.Conn) *User {
 	return &user
 }
 
-// Removes the given user
-func (hub *Hub) RemoveUser(user *User) {
+// Removes the given user from the user repository
+// Closes the user's connection
+// Removes the user from its group if there is one
+func (hub *Hub) removeUser(user *User) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
+	if user.conn != nil {
+		user.conn.Close()
+	}
+	hub.leave(user)
 	delete(hub.users, user.id)
 }
 
@@ -110,12 +116,12 @@ func (hub *Hub) newGroupId() string {
 
 // Makes a new group and adds the given user to it
 // Returns the newly created group id
-func (hub *Hub) NewGroup(user *User) string {
+func (hub *Hub) handleNewGroup(user *User) string {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
 	id := hub.newGroupId()
-	group := NewGroup(id)
+	group := newGroup(id)
 	hub.groups[group.id] = group
 
 	hub.join(group.id, user)
@@ -126,7 +132,7 @@ func (hub *Hub) NewGroup(user *User) string {
 // Appends the given conn to the group with the given id
 // If the user is already in a group, they will be removed from it
 // Return whether the conn was added to the group
-func (hub *Hub) Join(groupId string, user *User) bool {
+func (hub *Hub) handleJoin(groupId string, user *User) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
@@ -139,38 +145,37 @@ func (hub *Hub) join(groupId string, user *User) bool {
 	group, ok := hub.groups[groupId]
 
 	if ok {
-		if user.groupId != nil {
-			hub.exit(*user.groupId, user)
-		}
-
-		group.AddUser(user)
+		hub.leave(user)
+		group.addUser(user)
 	}
 
 	return ok
 }
 
-// Removes the given user from the repository (e.g. when the user disconnects)
+// User leaves its group if any
 // Returns whether the remove was successful or not
-func (hub *Hub) Exit(user *User) bool {
+func (hub *Hub) handleLeave(user *User) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	delete(hub.users, user.id)
-
-	return hub.exit(user)
+	return hub.leave(user)
 }
 
-// Helper method for Exit
-// Assumes the mutex is already locked
-// Returns whether the remove was successful or not
-func (hub *Hub) exit(user *User) bool {
+// Helper method for leave
+// Assumes the mutex is already acquired
+// Deletes group if there is nobody left in the group
+// Returns whether the leave was successful or not
+func (hub *Hub) leave(user *User) bool {
 	if user.groupId != nil {
 		id := *user.groupId
 
 		group, ok := hub.groups[id]
 
 		if ok {
-			group.RemoveUser(user)
+			isEmpty := group.removeUser(user)
+			if isEmpty {
+				delete(hub.groups, group.id)
+			}
 		}
 
 		return ok
@@ -181,7 +186,7 @@ func (hub *Hub) exit(user *User) bool {
 
 // Handles websocket message
 // Maps the message function to its own function (the client "calls" a function on the hub)
-func (hub *Hub) HandleMessage(p []byte, user *User) ([]byte, error) {
+func (hub *Hub) handleMessage(p []byte, user *User) ([]byte, error) {
 	readMessage := models.ReadMessage{}
 
 	err := json.Unmarshal(p, &readMessage)
@@ -192,7 +197,7 @@ func (hub *Hub) HandleMessage(p []byte, user *User) ([]byte, error) {
 
 	switch readMessage.Type {
 	case "NewGroup":
-		id := hub.NewGroup(user)
+		id := hub.handleNewGroup(user)
 		return json.Marshal(models.NewGroupResponse{Id: id})
 	case "Join":
 		joinGroup := models.JoinGroup{}
@@ -201,18 +206,18 @@ func (hub *Hub) HandleMessage(p []byte, user *User) ([]byte, error) {
 			return []byte{}, err
 		}
 
-		success := hub.Join(joinGroup.Id, user)
+		success := hub.handleJoin(joinGroup.Id, user)
 		return json.Marshal(models.JoinResponse{Success: success})
 
-	case "Exit":
-		exitGroup := models.ExitGroup{}
+	case "Leave":
+		exitGroup := models.LeaveGroup{}
 		err = json.Unmarshal([]byte(readMessage.Payload), &exitGroup)
 
 		if err != nil {
 			return []byte{}, err
 		}
 
-		success := hub.Exit(exitGroup.Id, user)
+		success := hub.handleLeave(user)
 
 		return json.Marshal(models.JoinResponse{Success: success})
 	default:
@@ -228,11 +233,10 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := hub.NewUser(conn)
+	user := hub.newUser(conn)
 
 	defer func() {
-		hub.RemoveUser(user)
-		conn.Close()
+		hub.removeUser(user)
 	}()
 
 	for {
@@ -247,7 +251,7 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		returnMessage, err := hub.HandleMessage(p, user)
+		returnMessage, err := hub.handleMessage(p, user)
 
 		if err != nil {
 			errBytes, errErr := json.Marshal(err)
@@ -267,7 +271,7 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func Handler() http.Handler {
-	hub := Hub{}
+	hub := newHub()
 
 	return &hub
 }

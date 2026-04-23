@@ -21,9 +21,9 @@ func TestNewGroupId(t *testing.T) {
 }
 
 func TestNewUser(t *testing.T) {
-	hub := NewHub()
+	hub := newHub()
 
-	user1 := hub.NewUser(nil)
+	user1 := hub.newUser(nil)
 
 	if len(hub.groups) != 0 {
 		t.Errorf("How could a group been made?")
@@ -39,11 +39,11 @@ func TestNewUser(t *testing.T) {
 }
 
 func TestRemoveUser(t *testing.T) {
-	hub := NewHub()
+	hub := newHub()
 
-	user1 := hub.NewUser(nil)
+	user1 := hub.newUser(nil)
 
-	hub.RemoveUser(user1)
+	hub.removeUser(user1)
 
 	if len(hub.users) != 0 {
 		t.Errorf("Should have remove an user")
@@ -51,11 +51,11 @@ func TestRemoveUser(t *testing.T) {
 }
 
 func TestNewGroup(t *testing.T) {
-	hub := NewHub()
+	hub := newHub()
 
-	user := hub.NewUser(nil)
+	user := hub.newUser(nil)
 
-	groupId := hub.NewGroup(user)
+	groupId := hub.handleNewGroup(user)
 
 	if len(hub.groups) != 1 {
 		t.Errorf("Should have added a group")
@@ -71,7 +71,7 @@ func TestNewGroup(t *testing.T) {
 		t.Errorf("User not been added")
 	}
 
-	groupId = hub.NewGroup(user)
+	groupId = hub.handleNewGroup(user)
 
 	if len(hub.groups) != 1 {
 		t.Errorf("Should have added a new group but old group is gone")
