@@ -122,7 +122,7 @@ func (group *Group) startGame() {
 					break
 				}
 
-				group.broadcast("Game " + string(progressBytes))
+				group.broadcast("ProgressUpdate " + string(progressBytes))
 			} else {
 				group.broadcast(fmt.Sprintf("Countdown %v", countdown))
 				countdown -= 1
