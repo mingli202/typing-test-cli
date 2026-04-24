@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"tui/backend/models"
+	"tui/backend/services/data_provider"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -23,6 +25,7 @@ type User struct {
 	group      *Group
 	totalWpm   float64
 	gamePlayed int
+	name       string
 }
 
 func (user *User) avgWpm() float64 {
@@ -32,13 +35,21 @@ func (user *User) avgWpm() float64 {
 type Group struct {
 	id    string
 	users map[string]*User
+
+	progress map[string]struct {
+		letterIndex uint
+		wpm         float64
+	}
+
+	data models.Data
 }
 
-// Makes a new group with the given id
-func newGroup(id string) Group {
+// Makes a new group with the given id and data
+func newGroup(id string, data models.Data) Group {
 	return Group{
 		id:    id,
 		users: make(map[string]*User),
+		data:  data,
 	}
 }
 
@@ -78,16 +89,18 @@ func (group *Group) avgWpm() float64 {
 }
 
 type Hub struct {
-	mu     sync.Mutex
-	groups map[string]Group
-	users  map[string]User
+	mu           sync.Mutex
+	groups       map[string]Group
+	users        map[string]User
+	dataProvider data_provider.DataProvider
 }
 
 // Makes a new hub
-func newHub() Hub {
+func newHub(dataProvider data_provider.DataProvider) Hub {
 	return Hub{
-		groups: make(map[string]Group),
-		users:  make(map[string]User),
+		groups:       make(map[string]Group),
+		users:        make(map[string]User),
+		dataProvider: dataProvider,
 	}
 }
 
@@ -150,7 +163,10 @@ func (hub *Hub) handleNewGroup(user *User) string {
 	defer hub.mu.Unlock()
 
 	id := hub.newGroupId()
-	group := newGroup(id)
+
+	data, _ := hub.dataProvider.NewData()
+
+	group := newGroup(id, data)
 	hub.groups[group.id] = group
 
 	hub.join(group.id, user)
@@ -229,9 +245,13 @@ All Functions:
 
 - NewGroup -> <NewlyJoinedGroupId>
 
-- JoinGroup <Id> -> <DidSucceed>
+- JoinGroup <Id> -> <LobbyInfo>
 
 - LeaveGroup -> <DidSucceed>
+
+- Match -> <LobbyInfo>
+
+- Start -> Countdown
 */
 func (hub *Hub) handleMessage(p []byte, user *User) (string, error) {
 	msg := string(p)
@@ -259,6 +279,8 @@ func (hub *Hub) handleMessage(p []byte, user *User) (string, error) {
 		success := hub.handleLeave(user)
 		return strconv.FormatBool(success), nil
 	case "Match":
+		return "", nil
+	case "UpdateStats":
 		return "", nil
 
 	default:
@@ -313,8 +335,8 @@ func (hub *Hub) String() string {
 	return fmt.Sprintf("Hub {\n    groups: %+v\n    user: %+v\n}", hub.groups, hub.users)
 }
 
-func Handler() http.Handler {
-	hub := newHub()
+func Handler(dataProvider data_provider.DataProvider) http.Handler {
+	hub := newHub(dataProvider)
 
 	ticker := time.NewTicker(5 * time.Second)
 

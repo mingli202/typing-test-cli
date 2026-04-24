@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"tui/backend/services/data_provider"
 )
+
+var dataProvider, _ = data_provider.NewDataProvider()
 
 func TestNewGroupId(t *testing.T) {
 	groupId := newGroupId()
@@ -22,7 +25,7 @@ func TestNewGroupId(t *testing.T) {
 }
 
 func TestNewUser(t *testing.T) {
-	hub := newHub()
+	hub := newHub(dataProvider)
 
 	user1 := hub.newUser(nil)
 
@@ -40,7 +43,7 @@ func TestNewUser(t *testing.T) {
 }
 
 func TestRemoveUser(t *testing.T) {
-	hub := newHub()
+	hub := newHub(dataProvider)
 
 	user1 := hub.newUser(nil)
 
@@ -52,7 +55,7 @@ func TestRemoveUser(t *testing.T) {
 }
 
 func TestNewGroup(t *testing.T) {
-	hub := newHub()
+	hub := newHub(dataProvider)
 
 	user := hub.newUser(nil)
 
@@ -90,7 +93,7 @@ func TestNewGroup(t *testing.T) {
 }
 
 func TestJoin(t *testing.T) {
-	hub := newHub()
+	hub := newHub(dataProvider)
 
 	user1 := hub.newUser(nil)
 	user2 := hub.newUser(nil)
@@ -153,7 +156,7 @@ func TestJoin(t *testing.T) {
 }
 
 func TestHandleMessageNewGroup(t *testing.T) {
-	hub := newHub()
+	hub := newHub(dataProvider)
 
 	user := hub.newUser(nil)
 
@@ -181,7 +184,7 @@ func TestHandleMessageNewGroup(t *testing.T) {
 }
 
 func TestHandleMessageJoinGroup(t *testing.T) {
-	hub := newHub()
+	hub := newHub(dataProvider)
 
 	user1 := hub.newUser(nil)
 
@@ -215,7 +218,7 @@ func TestHandleMessageJoinGroup(t *testing.T) {
 }
 
 func TestHandleMessageLeaveGroup(t *testing.T) {
-	hub := newHub()
+	hub := newHub(dataProvider)
 
 	user1 := hub.newUser(nil)
 
