@@ -88,6 +88,15 @@ func (group *Group) avgWpm() float64 {
 	return totalWpm / float64(n)
 }
 
+// Sends a message to every user of this group
+func (group *Group) broadcast(msg string) {
+	for user := range maps.Values(group.users) {
+		if user.conn != nil {
+			user.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+		}
+	}
+}
+
 type Hub struct {
 	mu           sync.Mutex
 	groups       map[string]Group
@@ -137,6 +146,7 @@ func (hub *Hub) removeUser(user *User) {
 
 	if user.conn != nil {
 		user.conn.Close()
+		user.conn = nil
 	}
 	hub.leave(user)
 	delete(hub.users, user.id)
