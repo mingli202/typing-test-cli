@@ -13,10 +13,12 @@ import (
 )
 
 type Group struct {
-	mu    sync.RWMutex
-	id    string
-	users map[string]*user.User
-	data  models.Data
+	mu            sync.RWMutex
+	id            string
+	users         map[string]*user.User
+	data          models.Data
+	progress      map[string]*models.Progress
+	isGameRunning bool
 }
 
 func (group *Group) Id() string {
@@ -26,9 +28,11 @@ func (group *Group) Id() string {
 // Makes a new group with the given id and data
 func NewGroup(id string, data models.Data) Group {
 	return Group{
-		id:    id,
-		users: make(map[string]*user.User),
-		data:  data,
+		id:            id,
+		users:         make(map[string]*user.User),
+		data:          data,
+		progress:      make(map[string]*models.Progress),
+		isGameRunning: false,
 	}
 }
 
@@ -70,6 +74,22 @@ func (group *Group) GetUsersSnapshot() []*user.User {
 	return snapShot
 }
 
+// Update the running game's stats
+// If there is no game, it does nothing
+func (group *Group) UpdateStats(u *user.User, wpm float64, progress uint8) {
+	group.mu.Lock()
+	defer group.mu.Unlock()
+
+	if !group.isGameRunning {
+		return
+	}
+
+	if p, ok := group.progress[u.Id()]; ok {
+		p.Wpm = wpm
+		p.Progress = progress
+	}
+}
+
 // Sends a message to every user of this group
 func (group *Group) broadcast(msg string) {
 	users := group.GetUsersSnapshot()
@@ -100,20 +120,13 @@ func (group *Group) avgWpm() float64 {
 }
 
 // Starts the game and broadcasts updates every 1 second
-func (group *Group) startGame() {
+func (group *Group) StartGame() {
+	group.setGameRunning()
+	defer group.endGameRunning()
 	users := group.GetUsersSnapshot()
 
 	minWpm := 30
 	nWords := len(strings.Split(group.data.Text, " "))
-
-	progress := make(map[string]models.Progress)
-
-	for _, userId := range users {
-		progress[userId.Id()] = models.Progress{
-			Wpm:      0,
-			Progress: 0,
-		}
-	}
 
 	ticker := time.Tick(time.Second * 1)
 	timer := time.NewTimer(time.Second * 60 * time.Duration(minWpm) * time.Duration(nWords))
@@ -124,11 +137,12 @@ func (group *Group) startGame() {
 		select {
 		case <-ticker:
 			if countdown == 0 {
-				progressBytes, err := json.Marshal(maps.Keys(progress))
+				progress := group.getProgressSnapshot()
+				progressBytes, err := json.Marshal(progress)
 
 				if err != nil {
 					log.Println(err)
-					break
+					return
 				}
 
 				broadcastUsers(users, "ProgressUpdate "+string(progressBytes))
@@ -137,10 +151,36 @@ func (group *Group) startGame() {
 				countdown -= 1
 			}
 		case <-timer.C:
-			break
+			return
 		}
-
 	}
+}
+
+func (group *Group) getProgressSnapshot() map[string]models.Progress {
+	group.mu.RLock()
+	defer group.mu.RUnlock()
+
+	progress := make(map[string]models.Progress)
+
+	for k, v := range group.progress {
+		progress[k] = *v
+	}
+
+	return progress
+}
+
+func (group *Group) setGameRunning() {
+	group.mu.Lock()
+	defer group.mu.Unlock()
+
+	group.isGameRunning = true
+}
+
+func (group *Group) endGameRunning() {
+	group.mu.Lock()
+	defer group.mu.Unlock()
+
+	group.isGameRunning = false
 }
 
 // Broadcast the given message to the given slice of users

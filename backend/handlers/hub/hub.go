@@ -86,6 +86,26 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) bool {
 	return true
 }
 
+// Handles the updating of stats
+// Does nothing if the user is not in a group
+// Does nothing if the user's group can't be found
+// Return whether the update was successful
+func (hub *Hub) handleUpdateStats(u *user.User, wpm float64, progress uint8) bool {
+	if u.GroupId == nil {
+		return false
+	}
+
+	group, ok := hub.getGroup(*u.GroupId)
+
+	if !ok {
+		return false
+	}
+
+	group.UpdateStats(u, wpm, progress)
+
+	return true
+}
+
 // Removes the given user from the user repository
 // Closes the user's connection
 // Removes the user from its group if there is one
@@ -153,8 +173,10 @@ All Functions:
 - Match -> <LobbyResponse> // TODO
 
 - Start -> Countdown // TODO
+
+- UpdateStats <Wpm> <Progress>
 */
-func (hub *Hub) handleMessage(p []byte, user *user.User) (string, error) {
+func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 	msg := string(p)
 	words := strings.Split(msg, " ")
 
@@ -164,24 +186,45 @@ func (hub *Hub) handleMessage(p []byte, user *user.User) (string, error) {
 
 	switch function {
 	case "NewGroup":
-		id := hub.handleNewGroup(user)
+		id := hub.handleNewGroup(u)
 		return id, nil
 
 	case "JoinGroup":
 		if len(words) != 2 {
-			return "", ErrorMessage{Msg: "Format must be JoinGroup <Id>"}
+			return "", fmt.Errorf("Format must be JoinGroup <Id>")
 		}
 
 		id := words[1]
-		success := hub.handleJoin(id, user)
+		success := hub.handleJoin(id, u)
 		return strconv.FormatBool(success), nil
 
 	case "LeaveGroup":
-		success := hub.handleLeave(user)
+		success := hub.handleLeave(u)
 		return strconv.FormatBool(success), nil
 	case "Match":
 		return "", nil
 	case "UpdateStats":
+		if len(words) != 3 {
+			return "", fmt.Errorf("Format must be UpdateStates <Wpm> <Progress>")
+		}
+
+		wpmStr := words[1]
+		progrerssStr := words[2]
+
+		wpm, err := strconv.ParseFloat(wpmStr, 64)
+
+		if err != nil {
+			return "", fmt.Errorf("<Wpm> must be a float")
+		}
+
+		progress, err := strconv.ParseInt(progrerssStr, 10, 8)
+
+		if err != nil {
+			return "", fmt.Errorf("<Progress> must be an int")
+		}
+
+		hub.handleUpdateStats(u, wpm, uint8(progress))
+
 		return "", nil
 
 	default:
