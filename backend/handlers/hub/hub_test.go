@@ -1,8 +1,10 @@
 package hub
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"testing"
 	"tui/backend/services/data_provider"
 )
@@ -284,4 +286,154 @@ func TestRemoveUser(t *testing.T) {
 	}
 
 	hub.removeUser(&user3) // don't crash pls
+}
+
+func TestHandleLeaveWithoutGroup(t *testing.T) {
+	hub := newHub(dataProvider)
+	user := newUser(nil)
+
+	if hub.handleLeave(&user) {
+		t.Fatal("leave should fail for user that is not in a group")
+	}
+}
+
+func TestLeaveHelperMatchesHandleLeaveBehavior(t *testing.T) {
+	hub := newHub(dataProvider)
+
+	user1 := newUser(nil)
+	user2 := newUser(nil)
+
+	groupId := hub.handleNewGroup(&user1)
+	hub.handleJoin(groupId, &user2)
+
+	hub.mu.Lock()
+	success := hub.leave(&user2)
+	hub.mu.Unlock()
+
+	if !success {
+		t.Fatal("leave helper should remove a user that belongs to a group")
+	}
+
+	group, ok := hub.getGroup(groupId)
+	if !ok {
+		t.Fatal("group should still exist because user1 is still in it")
+	}
+
+	if len(group.users) != 1 {
+		t.Fatal("group should keep a single user after helper leave")
+	}
+}
+
+func TestHandleMessageJoinGroupBadFormat(t *testing.T) {
+	hub := newHub(dataProvider)
+	user := newUser(nil)
+
+	cases := []string{
+		"JoinGroup",
+		"JoinGroup too many args",
+	}
+
+	for _, msg := range cases {
+		_, err := hub.handleMessage([]byte(msg), &user)
+		if err == nil {
+			t.Fatalf("expected error for %q", msg)
+		}
+
+		var errMsg ErrorMessage
+		if !errors.As(err, &errMsg) {
+			t.Fatalf("expected ErrorMessage for %q, got %T", msg, err)
+		}
+	}
+}
+
+func TestHandleMessageUnknownFunction(t *testing.T) {
+	hub := newHub(dataProvider)
+	user := newUser(nil)
+
+	_, err := hub.handleMessage([]byte("DoesNotExist"), &user)
+	if err == nil {
+		t.Fatal("expected FunctionNotFoundError")
+	}
+
+	var fnErr FunctionNotFoundError
+	if !errors.As(err, &fnErr) {
+		t.Fatalf("expected FunctionNotFoundError, got %T", err)
+	}
+}
+
+func TestHandleMessageEmptyInput(t *testing.T) {
+	hub := newHub(dataProvider)
+	user := newUser(nil)
+
+	_, err := hub.handleMessage([]byte(""), &user)
+	if err == nil {
+		t.Fatal("expected error for empty message")
+	}
+
+	var fnErr FunctionNotFoundError
+	if !errors.As(err, &fnErr) {
+		t.Fatalf("expected FunctionNotFoundError, got %T", err)
+	}
+
+	if fnErr.Fn != "" {
+		t.Fatalf("expected empty function name, got %q", fnErr.Fn)
+	}
+}
+
+func TestConcurrentJoinStability(t *testing.T) {
+	hub := newHub(dataProvider)
+
+	anchor1 := newUser(nil)
+	groupId1 := hub.handleNewGroup(&anchor1)
+
+	anchor2 := newUser(nil)
+	groupId2 := hub.handleNewGroup(&anchor2)
+
+	const nUsers = 24
+	const nIterations = 200
+
+	users := make([]*User, 0, nUsers)
+	for i := 0; i < nUsers; i++ {
+		user := newUser(nil)
+		users = append(users, &user)
+	}
+
+	var wg sync.WaitGroup
+
+	for _, user := range users {
+		wg.Add(1)
+		go func(u *User) {
+			defer wg.Done()
+
+			for i := 0; i < nIterations; i++ {
+				targetGroupID := groupId1
+				if i%2 == 1 {
+					targetGroupID = groupId2
+				}
+
+				ok := hub.handleJoin(targetGroupID, u)
+				if !ok {
+					t.Errorf("join should succeed for valid group %s", targetGroupID)
+					return
+				}
+			}
+		}(user)
+	}
+
+	wg.Wait()
+
+	group1, ok := hub.getGroup(groupId1)
+	if !ok {
+		t.Fatal("group1 should still exist")
+	}
+
+	group2, ok := hub.getGroup(groupId2)
+	if !ok {
+		t.Fatal("group2 should still exist")
+	}
+
+	totalUsers := len(group1.users) + len(group2.users)
+	if totalUsers != nUsers+2 {
+		t.Fatalf("expected %d users across both groups (including anchors), got %d", nUsers+2, totalUsers)
+	}
 }
