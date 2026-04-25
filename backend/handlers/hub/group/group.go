@@ -96,22 +96,20 @@ func (group *Group) GetUsersSnapshot() []*user.User {
 func (group *Group) broadcast(msg string) {
 	users := group.GetUsersSnapshot()
 
-	for _, u := range users {
-		if u != nil {
-			u.SendMsg(msg)
-		}
-	}
+	broadcastUsers(users, msg)
 }
 
 // Starts the game and broadcasts updates every 1 second
 func (group *Group) startGame() {
+	users := group.GetUsersSnapshot()
+
 	minWpm := 30
 	nWords := len(strings.Split(group.data.Text, " "))
 
 	progress := make(map[string]models.Progress)
 
-	for userId := range maps.Keys(group.users) {
-		progress[userId] = models.Progress{
+	for _, userId := range users {
+		progress[userId.Id()] = models.Progress{
 			Wpm:      0,
 			Progress: 0,
 		}
@@ -133,14 +131,23 @@ func (group *Group) startGame() {
 					break
 				}
 
-				group.broadcast("ProgressUpdate " + string(progressBytes))
+				broadcastUsers(users, "ProgressUpdate "+string(progressBytes))
 			} else {
-				group.broadcast(fmt.Sprintf("Countdown %v", countdown))
+				broadcastUsers(users, fmt.Sprintf("Countdown %v", countdown))
 				countdown -= 1
 			}
 		case <-timer.C:
 			break
 		}
 
+	}
+}
+
+// Broadcast the given message to the given slice of users
+func broadcastUsers(users []*user.User, msg string) {
+	for _, u := range users {
+		if u != nil {
+			u.SendMsg(msg)
+		}
 	}
 }
