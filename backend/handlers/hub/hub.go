@@ -114,6 +114,7 @@ func (hub *Hub) removeUser(user *user.User) {
 	user.CloseConn()
 }
 
+// Get the group associated with the given id
 func (hub *Hub) getGroup(id string) (*group.Group, bool) {
 	hub.mu.RLock()
 	defer hub.mu.RUnlock()
@@ -209,7 +210,7 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 		}
 
 		wpmStr := words[1]
-		progrerssStr := words[2]
+		progressStr := words[2]
 
 		wpm, err := strconv.ParseFloat(wpmStr, 64)
 
@@ -217,7 +218,7 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 			return "", fmt.Errorf("<Wpm> must be a float")
 		}
 
-		progress, err := strconv.ParseInt(progrerssStr, 10, 8)
+		progress, err := strconv.ParseInt(progressStr, 10, 8)
 
 		if err != nil {
 			return "", fmt.Errorf("<Progress> must be an int")
@@ -297,6 +298,7 @@ func Handler(dataProvider data_provider.DataProvider) http.Handler {
 	return &hub
 }
 
+// Gets a random 6 lowercase alphabetical letters
 func newGroupId() string {
 	s := ""
 
