@@ -3,7 +3,6 @@ package hub
 import (
 	"encoding/json"
 	"fmt"
-	"iter"
 	"log"
 	"maps"
 	"strings"
@@ -57,7 +56,7 @@ func (group *Group) avgWpm() float64 {
 
 	users := group.getUsersSnapshot()
 
-	for user := range users {
+	for _, user := range users {
 		if user != nil {
 			totalWpm += user.avgWpm()
 			n += 1
@@ -72,18 +71,24 @@ func (group *Group) avgWpm() float64 {
 }
 
 // Gets list of users at this moment of calling this function
-func (group *Group) getUsersSnapshot() iter.Seq[*User] {
+func (group *Group) getUsersSnapshot() []*User {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
-	return maps.Values(group.users)
+	var snapShot []*User
+
+	for user := range maps.Values(group.users) {
+		snapShot = append(snapShot, user)
+	}
+
+	return snapShot
 }
 
 // Sends a message to every user of this group
 func (group *Group) broadcast(msg string) {
 	users := group.getUsersSnapshot()
 
-	for user := range users {
+	for _, user := range users {
 		if user != nil {
 			user.sendMsg(msg)
 		}
