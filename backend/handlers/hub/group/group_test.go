@@ -23,11 +23,11 @@ func TestNewGroup(t *testing.T) {
 	users := gr.GetUsersSnapshot()
 
 	if users == nil {
-		t.Error("group.users should not be nil")
+		t.Fatal("group.users should not be nil")
 	}
 
 	if len(users) != 0 {
-		t.Error("There should be no users")
+		t.Fatal("There should be no users")
 	}
 }
 
@@ -41,10 +41,55 @@ func TestGroupAddUser(t *testing.T) {
 	users := gr.GetUsersSnapshot()
 
 	if len(users) != 1 || !slices.Contains(users, &u) {
-		t.Error("It should have added the added user")
+		t.Fatal("It should have added the added user")
 	}
 
 	if *u.GroupId != gr.Id() {
-		t.Error("user group should have been set to the group's id")
+		t.Fatal("user group should have been set to the group's id")
 	}
+
+	gr.AddUser(&u)
+
+	users = gr.GetUsersSnapshot()
+
+	if len(users) != 1 {
+		t.Fatal("Duplicate user tf")
+	}
+}
+
+func TestRemoverUser(t *testing.T) {
+	u1 := user.NewUser(nil)
+	u2 := user.NewUser(nil)
+
+	gr := newGroup()
+
+	gr.AddUser(&u1)
+	gr.AddUser(&u2)
+
+	isEmpty := gr.RemoveUser(&u2)
+
+	if isEmpty {
+		t.Fatal("Group is still not empty")
+	}
+
+	users := gr.GetUsersSnapshot()
+
+	if len(users) != 1 {
+		t.Fatal("User did not get removed")
+	}
+
+	if slices.Contains(users, &u2) {
+		t.Fatal("Group removed the wrong user vro")
+	}
+
+	if !slices.Contains(users, &u1) {
+		t.Fatal("Where tf is the first user")
+	}
+
+	isEmpty = gr.RemoveUser(&u1)
+
+	if !isEmpty {
+		t.Fatal("There should be no more users in the group")
+	}
+
 }
