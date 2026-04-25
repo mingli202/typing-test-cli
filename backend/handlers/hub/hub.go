@@ -45,6 +45,8 @@ func newUser(conn *websocket.Conn) User {
 
 // Init the buffered channel to listen for write messages
 func (user *User) initWriteMessageCh() {
+	defer close(user.ch)
+
 	for {
 		p, ok := <-user.ch
 
@@ -212,9 +214,9 @@ All Functions:
 
 - LeaveGroup -> <DidSucceed>
 
-- Match -> <LobbyResponse>
+- Match -> <LobbyResponse> // TODO
 
-- Start -> Countdown
+- Start -> Countdown // TODO
 */
 func (hub *Hub) handleMessage(p []byte, user *User) (string, error) {
 	msg := string(p)
