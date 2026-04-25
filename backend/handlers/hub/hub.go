@@ -353,15 +353,17 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := hub.newUser(conn)
+	user := newUser(conn)
+	go user.initWriteMessageCh()
 
 	log.Printf("New user connected: %v\n", user)
 
 	defer func() {
-		hub.removeUser(user)
+		hub.removeUser(&user)
 		log.Printf("User disconnected: %v\n", user)
 	}()
 
+	// listen for incoming messages in current goroutine
 	for {
 		messageType, p, err := conn.ReadMessage()
 
@@ -374,17 +376,13 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		returnMessage, err := hub.handleMessage(p, user)
+		returnMessage, err := hub.handleMessage(p, &user)
 
 		if err != nil {
 			returnMessage = ErrorMessage{Msg: err.Error()}.Error()
 		}
 
-		err = conn.WriteMessage(websocket.TextMessage, []byte(returnMessage))
-
-		if err != nil {
-			log.Println(err)
-		}
+		user.sendMsg(returnMessage)
 	}
 }
 
