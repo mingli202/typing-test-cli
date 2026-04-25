@@ -219,7 +219,7 @@ func TestHandleMessageLeaveGroup(t *testing.T) {
 
 	user2 := newUser(nil)
 
-	hub.join(groupId, &user2)
+	hub.handleJoin(groupId, &user2)
 
 	msg := "LeaveGroup"
 
