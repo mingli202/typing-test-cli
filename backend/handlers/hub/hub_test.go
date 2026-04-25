@@ -40,7 +40,7 @@ func TestNewUser(t *testing.T) {
 	}
 }
 
-func TestNewGroup(t *testing.T) {
+func TestHandleNewGroup(t *testing.T) {
 	hub := newHub(dataProvider)
 
 	user := newUser(nil)
