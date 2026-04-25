@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,17 @@ type Group struct {
 	id    string
 	users map[string]*User
 	data  models.Data
+}
+
+func newGroupId() string {
+	s := ""
+
+	for i := 0; i < 6; i += 1 {
+		randomChar := rand.IntN('z'-'a') + 'a'
+		s = s + string(rune(randomChar))
+	}
+
+	return s
 }
 
 // Makes a new group with the given id and data

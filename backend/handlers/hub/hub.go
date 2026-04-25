@@ -3,7 +3,6 @@ package hub
 import (
 	"fmt"
 	"log"
-	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
@@ -316,15 +315,4 @@ func Handler(dataProvider data_provider.DataProvider) http.Handler {
 	}()
 
 	return &hub
-}
-
-func newGroupId() string {
-	s := ""
-
-	for i := 0; i < 6; i += 1 {
-		randomChar := rand.IntN('z'-'a') + 'a'
-		s = s + string(rune(randomChar))
-	}
-
-	return s
 }
