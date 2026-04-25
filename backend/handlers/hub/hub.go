@@ -1,17 +1,14 @@
 package hub
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
-	"maps"
 	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"tui/backend/models"
 	"tui/backend/services/data_provider"
 
 	"github.com/google/uuid"
@@ -66,119 +63,66 @@ func (user *User) sendMsg(msg string) {
 	user.ch <- []byte(msg)
 }
 
-type Group struct {
-	id    string
-	users map[string]*User
-	data  models.Data
-}
-
-// Makes a new group with the given id and data
-func newGroup(id string, data models.Data) Group {
-	return Group{
-		id:    id,
-		users: make(map[string]*User),
-		data:  data,
-	}
-}
-
-// Adds the given user to this group
-func (group *Group) addUser(user *User) {
-	group.users[user.id] = user
-	user.group = group
-}
-
-// Removes the given user to this group
-// Returns whether this group is empty
-func (group *Group) removeUser(user *User) bool {
-	delete(group.users, user.id)
-	user.group = nil
-
-	return len(group.users) == 0
-}
-
-// avgWpm gets the average wpm of this group
-// Used to match users in relatively equal brackets
-func (group *Group) avgWpm() float64 {
-	totalWpm := 0.0
-	n := 0
-
-	for user := range maps.Values(group.users) {
-		if user != nil {
-			totalWpm += user.avgWpm()
-			n += 1
-		}
-	}
-
-	if n == 0 {
-		return 0.0
-	}
-
-	return totalWpm / float64(n)
-}
-
-// Sends a message to every user of this group
-func (group *Group) broadcast(msg string) {
-	for user := range maps.Values(group.users) {
-		if user.conn != nil {
-			user.conn.WriteMessage(websocket.TextMessage, []byte(msg))
-		}
-	}
-}
-
-// Starts the game and broadcasts updates every 1 second
-func (group *Group) startGame() {
-	minWpm := 30
-	nWords := len(strings.Split(group.data.Text, " "))
-
-	progress := make(map[string]models.Progress)
-
-	for userId := range maps.Keys(group.users) {
-		progress[userId] = models.Progress{
-			Wpm:      0,
-			Progress: 0,
-		}
-	}
-
-	ticker := time.Tick(time.Second * 1)
-	timer := time.NewTimer(time.Second * 60 * time.Duration(minWpm) * time.Duration(nWords))
-
-	countdown := 10
-
-	for {
-		select {
-		case <-ticker:
-			if countdown == 0 {
-				progressBytes, err := json.Marshal(maps.Keys(progress))
-
-				if err != nil {
-					log.Println(err)
-					break
-				}
-
-				group.broadcast("ProgressUpdate " + string(progressBytes))
-			} else {
-				group.broadcast(fmt.Sprintf("Countdown %v", countdown))
-				countdown -= 1
-			}
-		case <-timer.C:
-			break
-		}
-
-	}
-}
-
 type Hub struct {
 	mu           sync.RWMutex
-	groups       map[string]Group
+	groups       map[string]*Group
 	dataProvider data_provider.DataProvider
 }
 
 // Makes a new hub
 func newHub(dataProvider data_provider.DataProvider) Hub {
 	return Hub{
-		groups:       make(map[string]Group),
+		groups:       make(map[string]*Group),
 		dataProvider: dataProvider,
 	}
+}
+
+// Makes a new group and adds the given user to it
+// Returns the newly created group id
+func (hub *Hub) handleNewGroup(user *User) string {
+	group := hub.newGroup()
+
+	hub.handleJoin(group.id, user)
+
+	return group.id
+}
+
+// User leaves its group if any
+// If the group has no users, remove the group from the repo
+// Returns whether the remove was successful or not
+func (hub *Hub) handleLeave(user *User) bool {
+	if group := user.group; group != nil {
+		hub.mu.Lock()
+		defer hub.mu.Unlock()
+
+		isEmpty := group.removeUser(user)
+		if isEmpty {
+			delete(hub.groups, group.id)
+		}
+
+		return true
+	}
+
+	return false
+}
+
+// Appends the given conn to the group with the given id
+// If the user is already in a group, they will be removed from it
+// Return whether the conn was added to the group
+func (hub *Hub) handleJoin(groupId string, user *User) bool {
+	group, ok := hub.getGroup(groupId)
+
+	if !ok {
+		return false
+	}
+
+	if user.group != nil && user.group.id != groupId {
+		hub.handleLeave(user)
+	}
+
+	group.addUser(user)
+
+	return true
 }
 
 // Removes the given user from the user repository
@@ -192,7 +136,16 @@ func (hub *Hub) removeUser(user *User) {
 		user.conn.Close()
 		user.conn = nil
 	}
-	hub.leave(user)
+	hub.handleLeave(user)
+}
+
+func (hub *Hub) getGroup(id string) (*Group, bool) {
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+
+	group, ok := hub.groups[id]
+
+	return group, ok
 }
 
 // Returns a new unique group Id
@@ -209,9 +162,9 @@ func (hub *Hub) newGroupId() string {
 	return id
 }
 
-// Makes a new group and adds the given user to it
-// Returns the newly created group id
-func (hub *Hub) handleNewGroup(user *User) string {
+// Makes a new group in the hub
+// Returns the newly created group
+func (hub *Hub) newGroup() *Group {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
@@ -220,56 +173,9 @@ func (hub *Hub) handleNewGroup(user *User) string {
 	data, _ := hub.dataProvider.NewData()
 
 	group := newGroup(id, data)
-	hub.groups[group.id] = group
+	hub.groups[group.id] = &group
 
-	hub.join(group.id, user)
-
-	return id
-}
-
-// Appends the given conn to the group with the given id
-// If the user is already in a group, they will be removed from it
-// Return whether the conn was added to the group
-func (hub *Hub) handleJoin(groupId string, user *User) bool {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-
-	return hub.join(groupId, user)
-}
-
-// Helper method for Join.
-// Does nothing if group with given groupId is not found
-// Does nothing is user tries to join its own group
-// Assumes the lock is already acquired
-func (hub *Hub) join(groupId string, user *User) bool {
-	group, ok := hub.groups[groupId]
-
-	if ok {
-		if user.group != nil {
-			if groupId == user.group.id {
-				return true
-			} else {
-				hub.leave(user)
-			}
-		}
-
-		group.addUser(user)
-	}
-
-	return ok
-}
-
-// User leaves its group if any
-// Returns whether the remove was successful or not
-func (hub *Hub) handleLeave(user *User) bool {
-	if user.group != nil {
-		hub.mu.Lock()
-		defer hub.mu.Unlock()
-
-		return hub.leave(user)
-	}
-
-	return false
+	return &group
 }
 
 // Helper method for leave
