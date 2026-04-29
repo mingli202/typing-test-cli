@@ -209,7 +209,7 @@ func (group *Group) startGame() {
 	}
 }
 
-// Starts the countdown, allows for joins and exits
+// Starts the countdown of 10 seconds, allows for joins and exits
 func (group *Group) countDown() {
 	ticker := time.Tick(time.Second * 1)
 	countdown := 10

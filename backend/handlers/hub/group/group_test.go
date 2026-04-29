@@ -216,3 +216,36 @@ func TestLeaderWhenRemoveUser2(t *testing.T) {
 		t.Fatal("A new leader should be set")
 	}
 }
+
+func TestCountDown(t *testing.T) {
+	u1 := user.NewUser(nil)
+	u2 := user.NewUser(nil)
+	u3 := user.NewUser(nil)
+
+	gr := newGroup()
+
+	gr.AddUser(&u1)
+	gr.AddUser(&u2)
+
+	go gr.countDown()
+
+	time.Sleep(1 * time.Second)
+
+	gr.AddUser(&u3)
+
+	usersIds := gr.GetUserIdsSnapshot()
+
+	if len(usersIds) != 3 {
+		t.Fatal("Did not add user")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	if gr.RemoveUser(&u1) || gr.RemoveUser(&u2) {
+		t.Fatal("Group should not be empty")
+	}
+
+	if !gr.RemoveUser(&u3) {
+		t.Fatal("Group should be empty now")
+	}
+}
