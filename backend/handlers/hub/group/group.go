@@ -68,9 +68,7 @@ func (group *Group) RemoveUser(u *user.User) bool {
 		group.newLeader()
 	}
 
-	if _, ok := group.progress[userId]; ok {
-		delete(group.progress, userId)
-	}
+	delete(group.progress, userId)
 
 	return len(group.users) == 0
 }
