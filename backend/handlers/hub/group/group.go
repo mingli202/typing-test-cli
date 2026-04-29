@@ -68,6 +68,10 @@ func (group *Group) RemoveUser(u *user.User) bool {
 		group.newLeader()
 	}
 
+	if _, ok := group.progress[userId]; ok {
+		delete(group.progress, userId)
+	}
+
 	return len(group.users) == 0
 }
 
@@ -113,7 +117,10 @@ func (group *Group) UserStartGame(u *user.User) error {
 		return fmt.Errorf("Only the leader can start the game")
 	}
 
-	go group.startGame()
+	go func() {
+		group.countDown()
+		group.startGame()
+	}()
 
 	return nil
 }
@@ -161,28 +168,32 @@ func (group *Group) startGame() {
 	ticker := time.Tick(time.Second * 1)
 	timer := time.NewTimer(time.Second * 60 * time.Duration(minWpm) * time.Duration(nWords))
 
-	countdown := 10
-
 	for {
 		select {
 		case <-ticker:
-			if countdown == 0 {
-				progress := group.getProgressSnapshot()
-				progressBytes, err := json.Marshal(progress)
+			progress := group.getProgressSnapshot()
+			progressBytes, err := json.Marshal(progress)
 
-				if err != nil {
-					log.Println(err)
-					return
-				}
-
-				broadcastUsers(users, "ProgressUpdate "+string(progressBytes))
-			} else {
-				broadcastUsers(users, fmt.Sprintf("Countdown %v", countdown))
-				countdown -= 1
+			if err != nil {
+				log.Println(err)
+				return
 			}
+
+			broadcastUsers(users, "ProgressUpdate "+string(progressBytes))
 		case <-timer.C:
 			return
 		}
+	}
+}
+
+// Starts the countdown, allows for joins and exits
+func (group *Group) countDown() {
+	ticker := time.Tick(time.Second * 1)
+	countdown := 10
+
+	for _ = range ticker {
+		group.broadcast(fmt.Sprintf("Countdown %v", countdown))
+		countdown -= 1
 	}
 }
 
