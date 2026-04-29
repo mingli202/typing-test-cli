@@ -153,6 +153,7 @@ func (group *Group) startGame() {
 	defer group.endGameRunning()
 
 	users := group.GetUsersSnapshot()
+	group.initProgressForUsers(users)
 
 	minWpm := 30
 	nWords := len(strings.Split(group.data.Text, " "))
@@ -233,5 +234,17 @@ func (group *Group) newLeader() {
 		group.leaderId = &nextId
 	} else {
 		group.leaderId = nil
+	}
+}
+
+// Initialize progress of the given users
+func (group *Group) initProgressForUsers(users []*user.User) {
+	group.mu.Lock()
+	defer group.mu.Unlock()
+
+	for _, u := range users {
+		group.progress[u.Id()] = &models.Progress{
+			UserId: u.Id(),
+		}
 	}
 }
