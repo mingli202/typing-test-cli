@@ -421,6 +421,48 @@ func TestConcurrentJoinStability(t *testing.T) {
 	}
 }
 
+func TestNewGroupWithConn(t *testing.T) {
+	hub := newHub(dataProvider)
+
+	server := httptest.NewServer(&hub)
+	defer server.Close()
+
+	conn1 := newTestConn(t, server)
+	defer conn1.Close()
+
+	res := sendMsg(t, conn1, "NewGroup")
+	groupId := string(res)
+
+	if _, ok := hub.groups[groupId]; !ok {
+		t.Fatal("NewGroup did not respond with groupid")
+	}
+}
+
+func TestJoinGroupWithConn(t *testing.T) {
+	hub := newHub(dataProvider)
+
+	server := httptest.NewServer(&hub)
+	defer server.Close()
+
+	conn1 := newTestConn(t, server)
+	conn2 := newTestConn(t, server)
+	conn3 := newTestConn(t, server)
+	defer conn1.Close()
+	defer conn2.Close()
+	defer conn3.Close()
+
+	res := sendMsg(t, conn1, "NewGroup")
+	groupId := string(res)
+
+	if ok, err := strconv.ParseBool(string(sendMsg(t, conn2, "JoinGroup "+groupId))); err != nil || !ok {
+		t.Fatal("User 2 should be able to join group")
+	}
+
+	if ok, err := strconv.ParseBool(string(sendMsg(t, conn3, "JoinGroup "+groupId))); err != nil || !ok {
+		t.Fatal("User 3 should be able to join group")
+	}
+}
+
 func TestLeaveGroupNoCrash(t *testing.T) {
 	hub := newHub(dataProvider)
 
@@ -434,24 +476,11 @@ func TestLeaveGroupNoCrash(t *testing.T) {
 	defer conn2.Close()
 	defer conn3.Close()
 
-	if err := conn1.WriteMessage(websocket.TextMessage, []byte("NewGroup")); err != nil {
-		t.Fatal(err)
-	}
-
-	msgType, res, err := conn1.ReadMessage()
-
-	if msgType != websocket.TextMessage {
-		t.Fatal("Response is not a text message")
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	res := sendMsg(t, conn1, "NewGroup")
 	groupId := string(res)
 
-	if _, ok := hub.groups[groupId]; !ok {
-		t.Fatal("NewGroup did not respond with groupid")
-	}
+	sendMsg(t, conn2, "JoinGroup "+groupId)
+	sendMsg(t, conn3, "JoinGroup "+groupId)
 }
 
 // Gets a new connection to the test server
@@ -465,4 +494,21 @@ func newTestConn(t *testing.T, server *httptest.Server) *websocket.Conn {
 	}
 
 	return conn
+}
+
+func sendMsg(t *testing.T, conn *websocket.Conn, msg string) []byte {
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+		t.Fatal(err)
+	}
+
+	msgType, res, err := conn.ReadMessage()
+
+	if msgType != websocket.TextMessage {
+		t.Fatal("Response is not a text message")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return res
 }
