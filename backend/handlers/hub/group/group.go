@@ -138,6 +138,31 @@ func (group *Group) UserStartGame(u *user.User) error {
 	return nil
 }
 
+func (group *Group) AsLobbySnapshot() models.LobbyInfo {
+	group.mu.RLock()
+	defer group.mu.RUnlock()
+
+	players := make(map[string]models.PlayerInfo)
+
+	for id, u := range group.users {
+		if u == nil {
+			continue
+		}
+
+		players[id] = models.PlayerInfo{
+			IsLeader: group.leaderId != nil && id == *group.leaderId,
+		}
+	}
+
+	lobby := models.LobbyInfo{
+		LobbyId: group.id,
+		Data:    group.data,
+		Players: players,
+	}
+
+	return lobby
+}
+
 // Sends a message to every user of this group
 func (group *Group) broadcast(msg string) {
 	group.mu.RLock()
