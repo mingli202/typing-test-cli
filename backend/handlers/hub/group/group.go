@@ -243,8 +243,6 @@ func (group *Group) initProgressForUsers(users []*user.User) {
 	defer group.mu.Unlock()
 
 	for _, u := range users {
-		group.progress[u.Id()] = &models.Progress{
-			UserId: u.Id(),
-		}
+		group.progress[u.Id()] = &models.Progress{}
 	}
 }
