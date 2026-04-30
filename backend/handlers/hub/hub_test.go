@@ -573,8 +573,8 @@ func newTestConn(t *testing.T, server *httptest.Server) *websocket.Conn {
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 
-	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 
 	if err != nil {
 		t.Fatal(err)
