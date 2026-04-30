@@ -1,5 +1,7 @@
 package models
 
+import "encoding/json"
+
 type Progress struct {
 	// The current wpm of the user, calculated by the tui client
 	Wpm float64
@@ -15,4 +17,14 @@ type LobbyInfo struct {
 
 type PlayerInfo struct {
 	IsLeader bool
+}
+
+func (lobbyInfo LobbyInfo) ToMsg() (string, error) {
+	lobbyInfoStr, err := json.Marshal(lobbyInfo)
+
+	if err != nil {
+		return "", err
+	}
+
+	return "LobbyInfo " + string(lobbyInfoStr), nil
 }
