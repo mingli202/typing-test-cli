@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
@@ -515,6 +516,7 @@ func TestJoinGroupWithConn(t *testing.T) {
 
 	groupId := lobby.LobbyId
 
+	// User2 join group
 	sendMsg(t, conn2, "JoinGroup "+groupId)
 	var joinedLobby models.LobbyInfo
 	recvMsgJson(t, conn2, &joinedLobby)
@@ -523,12 +525,22 @@ func TestJoinGroupWithConn(t *testing.T) {
 		t.Fatal("User 2 should be able to join group")
 	}
 
-	sendMsg(t, conn2, "JoinGroup "+groupId)
-	recvMsgJson(t, conn2, &joinedLobby)
+	// User1 should have received join notice
+	recvMsgJson(t, conn1, &lobby)
+
+	if len(lobby.Players) != 2 {
+		t.Fatal("User1 did not receive join notice")
+	}
+
+	// User3 join group
+	sendMsg(t, conn3, "JoinGroup "+groupId)
+	recvMsgJson(t, conn3, &joinedLobby)
 
 	if joinedLobby.LobbyId != groupId {
 		t.Fatal("User 3 should be able to join group")
 	}
+
+	recvMsgJson(t, conn2, "JoinGroup "+groupId)
 
 }
 
@@ -560,6 +572,9 @@ func newTestConn(t *testing.T, server *httptest.Server) *websocket.Conn {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 
 	if err != nil {
 		t.Fatal(err)
