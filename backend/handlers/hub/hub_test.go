@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http/httptest"
 	"slices"
 	"strconv"
@@ -17,6 +18,117 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+// A fake client
+type FakeClient struct {
+	mu        sync.Mutex
+	players   map[string]models.PlayerInfo
+	lobbyInfo models.LobbyInfo
+	stop      chan struct{}
+	conn      *websocket.Conn
+}
+
+func newFakeClient(t *testing.T, server *httptest.Server) *FakeClient {
+	fakeClient := FakeClient{}
+
+	conn := newTestConn(t, server)
+	go fakeClient.listen(conn)
+
+	return &fakeClient
+}
+
+func (fakeClient *FakeClient) listen(conn *websocket.Conn) {
+	go func() {
+		<-fakeClient.stop
+		conn.Close()
+	}()
+
+	for {
+		msgType, p, err := conn.ReadMessage()
+
+		if err != nil {
+			return
+		}
+
+		if msgType != websocket.TextMessage {
+			continue
+		}
+
+		msg := strings.Split(string(p), " ")
+
+		if len(msg) < 1 {
+			continue
+		}
+
+		cmd := msg[0]
+
+		switch cmd {
+		case "UpdatePlayers":
+			if len(msg) < 2 {
+				continue
+			}
+
+			playersStr := strings.Join(msg[1:], " ")
+
+			var players map[string]models.PlayerInfo
+			err := json.Unmarshal([]byte(playersStr), &players)
+
+			if err != nil {
+				continue
+			}
+
+			fakeClient.updatePlayers(players)
+		case "LobbyInfo":
+			if len(msg) < 2 {
+				continue
+			}
+
+			lobbyStr := strings.Join(msg[1:], " ")
+
+			var lobbyInfo models.LobbyInfo
+			err := json.Unmarshal([]byte(lobbyStr), &lobbyInfo)
+
+			if err != nil {
+				continue
+			}
+
+			fakeClient.updateLobbyInfo(lobbyInfo)
+		}
+	}
+}
+
+func (fakeClient *FakeClient) getPlayers() map[string]models.PlayerInfo {
+	fakeClient.mu.Lock()
+	defer fakeClient.mu.Unlock()
+
+	return maps.Clone(fakeClient.players)
+}
+
+func (fakeClient *FakeClient) getLobbyInfo() models.LobbyInfo {
+	fakeClient.mu.Lock()
+	defer fakeClient.mu.Unlock()
+
+	return fakeClient.lobbyInfo
+}
+
+func (fakeClient *FakeClient) updatePlayers(players map[string]models.PlayerInfo) {
+	fakeClient.mu.Lock()
+	defer fakeClient.mu.Unlock()
+
+	fakeClient.players = players
+}
+
+func (fakeClient *FakeClient) updateLobbyInfo(lobbyInfo models.LobbyInfo) {
+	fakeClient.mu.Lock()
+	defer fakeClient.mu.Unlock()
+
+	fakeClient.lobbyInfo = lobbyInfo
+}
+
+func (fakeClient *FakeClient) cleanup() {
+	fakeClient.stop <- struct{}{}
+	close(fakeClient.stop)
+}
 
 var dataProvider, _ = data_provider.NewDataProvider()
 
@@ -526,9 +638,10 @@ func TestJoinGroupWithConn(t *testing.T) {
 	}
 
 	// User1 should have received join notice
-	recvMsgJson(t, conn1, &lobby)
+	var players map[string]models.PlayerInfo
+	recvMsgJson(t, conn1, &players)
 
-	if len(lobby.Players) != 2 {
+	if len(players) != 2 {
 		t.Fatal("User1 did not receive join notice")
 	}
 
