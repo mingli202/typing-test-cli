@@ -65,5 +65,7 @@ func (user *User) Cleanup() {
 	if user.conn != nil {
 		user.conn.Close()
 	}
-	close(user.ch)
+	if user.ch != nil {
+		close(user.ch)
+	}
 }
