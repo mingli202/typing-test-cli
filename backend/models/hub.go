@@ -12,7 +12,6 @@ type Progress struct {
 type LobbyInfo struct {
 	LobbyId string
 	Data    Data
-	Players map[string]PlayerInfo
 }
 
 type PlayerInfo struct {
