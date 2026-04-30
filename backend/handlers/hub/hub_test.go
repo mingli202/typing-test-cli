@@ -518,10 +518,10 @@ func TestJoinGroupWithConn(t *testing.T) {
 
 	// User2 join group
 	sendMsg(t, conn2, "JoinGroup "+groupId)
-	var joinedLobby models.LobbyInfo
-	recvMsgJson(t, conn2, &joinedLobby)
+	var joinedLobby2 models.LobbyInfo
+	recvMsgJson(t, conn2, &joinedLobby2)
 
-	if joinedLobby.LobbyId != groupId {
+	if joinedLobby2.LobbyId != groupId {
 		t.Fatal("User 2 should be able to join group")
 	}
 
@@ -533,14 +533,26 @@ func TestJoinGroupWithConn(t *testing.T) {
 	}
 
 	// User3 join group
+	var joinedLobby3 models.LobbyInfo
 	sendMsg(t, conn3, "JoinGroup "+groupId)
-	recvMsgJson(t, conn3, &joinedLobby)
+	recvMsgJson(t, conn3, &joinedLobby3)
 
-	if joinedLobby.LobbyId != groupId {
+	if joinedLobby3.LobbyId != groupId {
 		t.Fatal("User 3 should be able to join group")
 	}
 
-	recvMsgJson(t, conn2, "JoinGroup "+groupId)
+	// User2 and user 1 should also have received
+	recvMsgJson(t, conn2, &joinedLobby2)
+
+	if len(joinedLobby2.Players) != 3 {
+		t.Fatal("User 2 should have recieved new lobby")
+	}
+
+	recvMsgJson(t, conn1, &lobby)
+
+	if len(lobby.Players) != 3 {
+		t.Fatal("User 2 should have recieved new lobby")
+	}
 
 }
 
