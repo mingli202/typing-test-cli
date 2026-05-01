@@ -52,6 +52,19 @@ func (mockUser *MockUser) listenForMsg(t *testing.T) {
 	})
 }
 
+func (mockUser *MockUser) listenForMsgN(t *testing.T, n int) {
+	mockUser.wg.Go(func() {
+		for i := 0; i < n; i += 1 {
+			log.Println("Waiting for msg")
+			p := <-mockUser.ch
+			msg := string(p)
+			log.Println("msg received " + msg)
+
+			mockUser.handleMsg(t, msg)
+		}
+	})
+}
+
 func (mockUser *MockUser) handleMsg(t *testing.T, msg string) {
 	msgArr := strings.Split(msg, " ")
 
@@ -586,16 +599,15 @@ func TestConcurrentJoinStability(t *testing.T) {
 	}
 }
 
-func TestNewGroupWithRes(t *testing.T) {
+func TestNewGroupWithSync(t *testing.T) {
 	hub := newHub(dataProvider)
 
 	mockUser := newMockUser(t)
 
-	mockUser.listenForMsg(t) // expects 1 msg
+	mockUser.listenForMsgN(t, 2) // expects 2 msg
 
 	mockClientMsg(t, &hub, mockUser, "NewGroup")
 
-	// expects 1 msg
 	mockUser.waitForMsg()
 
 	groupId := mockUser.getLobbyInfo().LobbyId
@@ -603,53 +615,37 @@ func TestNewGroupWithRes(t *testing.T) {
 	if _, ok := hub.groups[groupId]; !ok {
 		t.Fatal("NewGroup did not respond with groupid")
 	}
+
+	if len(mockUser.players) != 1 {
+		t.Fatal("user1 did not get players notice")
+	}
 }
 
-// func TestJoinGroupWithConn(t *testing.T) {
-// 	hub := newHub(dataProvider)
-//
-// 	u1 := newMockUser(t, server)
-// 	u2 := newMockUser(t, server)
-// 	u3 := newMockUser(t, server)
-//
-// 	defer u1.cleanup()
-// 	defer u2.cleanup()
-// 	defer u3.cleanup()
-//
-// 	u1.sendMsg(t, "NewGroup")
-//
-// 	groupId := u1.getLobbyInfo().LobbyId
-//
-// 	// User2 join group
-// 	u2.sendMsg(t, "JoinGroup "+groupId)
-//
-// 	if u2.getLobbyInfo().LobbyId != groupId {
-// 		t.Fatal("User 2 should be able to join group")
-// 	}
-//
-// 	// User1 should have received join notice
-//
-// 	if len(u1.getPlayers()) != 2 {
-// 		t.Fatal("User1 did not receive join notice")
-// 	}
-//
-// 	// User3 join group
-// 	u3.sendMsg(t, "JoinGroup "+groupId)
-//
-// 	if u3.getLobbyInfo().LobbyId != groupId {
-// 		t.Fatal("User 3 should be able to join group")
-// 	}
-//
-// 	// User1 and user2 should also have received
-// 	if len(u1.getPlayers()) != 3 {
-// 		t.Fatal("User 2 should have recieved new lobby")
-// 	}
-//
-// 	if len(u2.getPlayers()) != 3 {
-// 		t.Fatal("User 2 should have recieved new lobby")
-// 	}
-//
-// }
+func TestJoinGroupWithSync(t *testing.T) {
+	hub := newHub(dataProvider)
+	mockUser1 := newMockUser(t)
+	mockUser1.listenForMsg(t) // expects 1 msg
+	mockClientMsg(t, &hub, mockUser1, "NewGroup")
+	mockUser1.waitForMsg()
+	groupId := mockUser1.getLobbyInfo().LobbyId
+
+	mockUser2 := newMockUser(t)
+
+	// user1 should receive update players
+	mockUser1.listenForMsg(t)
+
+	// user2 should receive lobby info and player info
+	mockUser2.listenForMsgN(t, 2)
+
+	mockClientMsg(t, &hub, mockUser2, "JoinGroup "+groupId)
+
+	mockUser1.waitForMsg()
+	mockUser2.waitForMsg()
+
+	if len(mockUser1.players) != 2 {
+		t.Fatal("user1 did not receive player update")
+	}
+}
 
 func mockClientMsg(t *testing.T, hub *Hub, mockUser *MockUser, msg string) {
 	u := mockUser.u
