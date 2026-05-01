@@ -624,7 +624,7 @@ func TestNewGroupWithSync(t *testing.T) {
 func TestJoinGroupWithSync(t *testing.T) {
 	hub := newHub(dataProvider)
 	mockUser1 := newMockUser(t)
-	mockUser1.listenForMsg(t) // expects 1 msg
+	mockUser1.listenForMsgN(t, 2)
 	mockClientMsg(t, &hub, mockUser1, "NewGroup")
 	mockUser1.waitForMsg()
 	groupId := mockUser1.getLobbyInfo().LobbyId
@@ -643,6 +643,9 @@ func TestJoinGroupWithSync(t *testing.T) {
 	mockUser2.waitForMsg()
 
 	if len(mockUser1.players) != 2 {
+		t.Fatal("user1 did not receive player update")
+	}
+	if len(mockUser2.players) != 2 {
 		t.Fatal("user1 did not receive player update")
 	}
 }
