@@ -158,7 +158,6 @@ func (group *Group) AsLobbySnapshot() models.LobbyInfo {
 	lobby := models.LobbyInfo{
 		LobbyId: group.id,
 		Data:    group.data,
-		Players: players,
 	}
 
 	return lobby

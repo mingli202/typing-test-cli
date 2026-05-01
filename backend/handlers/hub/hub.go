@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"maps"
 	"math/rand/v2"
 	"net/http"
 	"strconv"
@@ -87,22 +86,6 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, erro
 	group.AddUser(u)
 
 	lobbyInfo := group.AsLobbySnapshot()
-
-	userIdsWithoutU := make([]string, 0)
-
-	for userId := range maps.Keys(lobbyInfo.Players) {
-		if userId != u.Id() {
-			userIdsWithoutU = append(userIdsWithoutU, userId)
-		}
-	}
-
-	msg, err := lobbyInfo.ToMsg()
-
-	if err != nil {
-		return models.LobbyInfo{}, err
-	}
-
-	group.BroadcastToUserWithId(userIdsWithoutU, msg)
 
 	return lobbyInfo, nil
 }
