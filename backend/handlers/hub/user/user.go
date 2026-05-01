@@ -1,8 +1,6 @@
 package user
 
 import (
-	"log"
-
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -62,9 +60,7 @@ func (user *User) InitWriteMessageCh() {
 
 // Helper method to send a string of message
 func (user *User) SendMsg(msg string) {
-	log.Println("user.SendMsg " + msg)
 	if user.ch != nil {
-		log.Println("user.ch is not nil")
 		user.ch <- []byte(msg)
 	}
 }
