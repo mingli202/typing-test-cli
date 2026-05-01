@@ -49,35 +49,10 @@ func (mockClient *MockClient) listen(t *testing.T) {
 	go func() {
 		for p := range mockClient.ch {
 			msg := string(p)
-			fmt.Println("msg received " + msg)
 
 			mockClient.handleMsg(t, msg)
 		}
 	}()
-}
-
-func (mockClient *MockClient) listenForMsg(t *testing.T) {
-	mockClient.wg.Go(func() {
-		fmt.Println("Waiting for msg")
-		p := <-mockClient.ch
-		msg := string(p)
-		fmt.Println("msg received " + msg)
-
-		mockClient.handleMsg(t, msg)
-	})
-}
-
-func (mockClient *MockClient) listenForMsgN(t *testing.T, n int) {
-	mockClient.wg.Go(func() {
-		for i := 0; i < n; i += 1 {
-			fmt.Println("Waiting for msg")
-			p := <-mockClient.ch
-			msg := string(p)
-			fmt.Println("msg received " + msg)
-
-			mockClient.handleMsg(t, msg)
-		}
-	})
 }
 
 func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
@@ -117,10 +92,6 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 
 		mockClient.updateLobbyInfo(lobbyInfo)
 	}
-}
-
-func (mockClient *MockClient) waitForMsg() {
-	mockClient.wg.Wait()
 }
 
 func (mockClient *MockClient) getPlayers() map[string]models.PlayerInfo {
@@ -722,6 +693,60 @@ func TestLeaveGroupWithSync(t *testing.T) {
 
 	if !mockClient3.players[mockClient2.u.Id()].IsLeader {
 		t.Fatal("user 2 should be the leader")
+	}
+}
+
+func TestStressTestSync(t *testing.T) {
+	hub := newHub(dataProvider)
+
+	mockClient1 := newMockClient()
+	mockClient2 := newMockClient()
+	mockClient3 := newMockClient()
+
+	mockClient1.listen(t)
+	mockClient2.listen(t)
+	mockClient3.listen(t)
+	defer mockClient1.close()
+	defer mockClient2.close()
+	defer mockClient3.close()
+
+	mockClientMsg(t, &hub, mockClient1, "NewGroup")
+
+	groupId := mockClient1.lobbyInfo.LobbyId
+
+	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
+
+	const nClient = 24
+	const nIterations = 200
+
+	var wg sync.WaitGroup
+	for i := 0; i < nClient; i++ {
+		wg.Go(func() {
+			mc := newMockClient()
+
+			mc.listen(t)
+			defer mc.close()
+
+			for i := 0; i < nIterations; i++ {
+				mockClientMsg(t, &hub, mc, "JoinGroup "+groupId)
+				mockClientMsg(t, &hub, mc, "LeaveGroup")
+			}
+		})
+	}
+
+	mockClientMsg(t, &hub, mockClient3, "JoinGroup "+groupId)
+
+	wg.Wait()
+
+	// in the end, number of players should not have changed
+	if len(mockClient1.players) != 3 {
+		t.Fatal("Number of players is not 3")
+	}
+	if len(mockClient2.players) != 3 {
+		t.Fatal("Number of players is not 3")
+	}
+	if len(mockClient3.players) != 3 {
+		t.Fatal("Number of players is not 3")
 	}
 }
 
