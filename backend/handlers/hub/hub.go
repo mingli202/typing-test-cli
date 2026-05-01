@@ -303,6 +303,9 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("User disconnected: %v\n", user)
 	}()
 
+	// sends the user id to identify itself
+	user.SendMsg("UserId " + user.Id())
+
 	// listen for incoming messages in current goroutine
 	for {
 		messageType, p, err := conn.ReadMessage()
