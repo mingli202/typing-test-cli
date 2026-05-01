@@ -320,9 +320,10 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 			returnMessage = ErrorMessage{Msg: err.Error()}.Error()
+		} else if returnMessage != "" {
+			user.SendMsg(returnMessage)
 		}
 
-		user.SendMsg(returnMessage)
 	}
 }
 
