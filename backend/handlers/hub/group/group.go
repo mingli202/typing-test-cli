@@ -143,6 +143,19 @@ func (group *Group) GetLobbyInfo() models.LobbyInfo {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
+	lobby := models.LobbyInfo{
+		LobbyId: group.id,
+		Data:    group.data,
+	}
+
+	return lobby
+}
+
+// Sends the UpdatePlayers msg to every user of this group
+func (group *Group) SendUpdatePlayers() {
+	group.mu.RLock()
+	defer group.mu.RUnlock()
+
 	players := make(map[string]models.PlayerInfo)
 
 	for id, u := range group.users {
@@ -155,17 +168,18 @@ func (group *Group) GetLobbyInfo() models.LobbyInfo {
 		}
 	}
 
-	lobby := models.LobbyInfo{
-		LobbyId: group.id,
-		Data:    group.data,
+	playersAsStr, err := json.Marshal(players)
+
+	if err != nil {
+		return
 	}
 
-	return lobby
+	group.broadcastLocked("UpdatePlayers " + string(playersAsStr))
 }
 
 // Broadcast the given message to the given slice of users
 // Return if at least one user got the message
-func (group *Group) BroadcastToUserWithId(userIds []string, msg string) bool {
+func (group *Group) broadcastToUserWithId(userIds []string, msg string) bool {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
@@ -188,6 +202,16 @@ func (group *Group) broadcast(msg string) {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
+	for _, u := range group.users {
+		if u != nil {
+			u.SendMsg(msg)
+		}
+	}
+}
+
+// Sends a message to every user of this group.
+// Assumes that the lock is already acquired
+func (group *Group) broadcastLocked(msg string) {
 	for _, u := range group.users {
 		if u != nil {
 			u.SendMsg(msg)
@@ -242,7 +266,7 @@ func (group *Group) startGame() {
 				return
 			}
 
-			atLeastOneSend := group.BroadcastToUserWithId(userIds, "ProgressUpdate "+string(progressBytes))
+			atLeastOneSend := group.broadcastToUserWithId(userIds, "ProgressUpdate "+string(progressBytes))
 
 			if !atLeastOneSend {
 				return
