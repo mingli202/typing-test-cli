@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"maps"
 	"slices"
 	"strconv"
@@ -22,7 +21,7 @@ type MockClient struct {
 	mu        sync.Mutex
 	players   map[string]models.PlayerInfo
 	lobbyInfo models.LobbyInfo
-	u         user.User
+	u         *user.User
 	ch        chan []byte
 	wg        sync.WaitGroup
 }
@@ -35,7 +34,7 @@ func newMockClient() *MockClient {
 	u.SetCh(ch)
 
 	mockClient := MockClient{
-		u:  u,
+		u:  &u,
 		ch: ch,
 	}
 
@@ -50,7 +49,7 @@ func (mockClient *MockClient) listen(t *testing.T) {
 	go func() {
 		for p := range mockClient.ch {
 			msg := string(p)
-			log.Println("msg received " + msg)
+			fmt.Println("msg received " + msg)
 
 			mockClient.handleMsg(t, msg)
 		}
@@ -59,10 +58,10 @@ func (mockClient *MockClient) listen(t *testing.T) {
 
 func (mockClient *MockClient) listenForMsg(t *testing.T) {
 	mockClient.wg.Go(func() {
-		log.Println("Waiting for msg")
+		fmt.Println("Waiting for msg")
 		p := <-mockClient.ch
 		msg := string(p)
-		log.Println("msg received " + msg)
+		fmt.Println("msg received " + msg)
 
 		mockClient.handleMsg(t, msg)
 	})
@@ -71,10 +70,10 @@ func (mockClient *MockClient) listenForMsg(t *testing.T) {
 func (mockClient *MockClient) listenForMsgN(t *testing.T, n int) {
 	mockClient.wg.Go(func() {
 		for i := 0; i < n; i += 1 {
-			log.Println("Waiting for msg")
+			fmt.Println("Waiting for msg")
 			p := <-mockClient.ch
 			msg := string(p)
-			log.Println("msg received " + msg)
+			fmt.Println("msg received " + msg)
 
 			mockClient.handleMsg(t, msg)
 		}
@@ -320,6 +319,10 @@ func TestHandleMessageNewGroup(t *testing.T) {
 
 	if !slices.Contains(group.GetUsersSnapshot(), &user) {
 		t.Fatal("Could not find user in returned group")
+	}
+
+	if user.GroupId == nil || *user.GroupId != group.Id() {
+		t.Fatal("user groupid did not get set")
 	}
 }
 
@@ -634,17 +637,24 @@ func TestNewGroupWithSync(t *testing.T) {
 	if len(mockClient.players) != 1 {
 		t.Fatal("user1 did not get players notice")
 	}
+
+	if mockClient.u.GroupId == nil || *mockClient.u.GroupId != groupId {
+		t.Fatal("actual user did not get its groupid set")
+	}
 }
 
 func TestJoinGroupWithSync(t *testing.T) {
 	hub := newHub(dataProvider)
 	mockClient1 := newMockClient()
 	mockClient2 := newMockClient()
+	mockClient3 := newMockClient()
 
 	mockClient1.listen(t)
 	mockClient2.listen(t)
+	mockClient3.listen(t)
 	defer mockClient1.close()
 	defer mockClient2.close()
+	defer mockClient3.close()
 
 	mockClientMsg(t, &hub, mockClient1, "NewGroup")
 	groupId := mockClient1.getLobbyInfo().LobbyId
@@ -655,7 +665,19 @@ func TestJoinGroupWithSync(t *testing.T) {
 		t.Fatal("user1 did not receive player update")
 	}
 	if len(mockClient2.players) != 2 {
+		t.Fatal("user2 did not receive player update")
+	}
+
+	mockClientMsg(t, &hub, mockClient3, "JoinGroup "+groupId)
+
+	if len(mockClient1.players) != 3 {
 		t.Fatal("user1 did not receive player update")
+	}
+	if len(mockClient2.players) != 3 {
+		t.Fatal("user2 did not receive player update")
+	}
+	if len(mockClient3.players) != 3 {
+		t.Fatal("user3 did not receive player update")
 	}
 }
 
@@ -698,7 +720,7 @@ func TestLeaveGroupWithSync(t *testing.T) {
 func mockClientMsg(t *testing.T, hub *Hub, mockUser *MockClient, msg string) {
 	u := mockUser.u
 
-	res, err := hub.handleMessage([]byte(msg), &u)
+	res, err := hub.handleMessage([]byte(msg), u)
 
 	if err != nil {
 		u.SendMsg(err.Error())
