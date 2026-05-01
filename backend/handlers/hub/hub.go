@@ -86,6 +86,8 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, erro
 
 	lobbyInfo := group.GetLobbyInfo()
 
+	group.SendUpdatePlayers()
+
 	return lobbyInfo, nil
 }
 
@@ -222,7 +224,7 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 			return "", err
 		}
 
-		return string(str), nil
+		return str, nil
 
 	case "JoinGroup":
 		if len(words) != 2 {
@@ -235,8 +237,8 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 			return "", err
 		}
 
-		str, marshalErr := lobbyInfo.ToMsg()
-		if marshalErr != nil {
+		str, err := lobbyInfo.ToMsg()
+		if err != nil {
 			return "", err
 		}
 
