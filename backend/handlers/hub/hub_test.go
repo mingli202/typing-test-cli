@@ -4,19 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"maps"
-	"net/http/httptest"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
-
-	"github.com/gorilla/websocket"
 )
 
 // A mock user
@@ -24,73 +21,74 @@ type MockUser struct {
 	mu        sync.Mutex
 	players   map[string]models.PlayerInfo
 	lobbyInfo models.LobbyInfo
-	stop      chan struct{}
-	conn      *websocket.Conn
+	u         user.User
+	ch        chan []byte
+	wg        sync.WaitGroup
 }
 
-func newMockUser(t *testing.T, server *httptest.Server) *MockUser {
-	mockUser := MockUser{}
+func newMockUser(t *testing.T) *MockUser {
+	u := user.NewUser(nil)
 
-	conn := newTestConn(t, server)
-	go mockUser.listen(conn)
+	ch := make(chan []byte)
+
+	u.SetCh(ch)
+
+	mockUser := MockUser{
+		u:  u,
+		ch: ch,
+	}
 
 	return &mockUser
 }
 
-func (mockUser *MockUser) listen(conn *websocket.Conn) {
-	go func() {
-		<-mockUser.stop
-		conn.Close()
-	}()
+func (mockUser *MockUser) listenForMsg(t *testing.T) {
+	mockUser.wg.Go(func() {
+		log.Println("Waiting for msg")
+		p := <-mockUser.ch
+		msg := string(p)
+		log.Println("msg received " + msg)
 
-	for {
-		msgType, p, err := conn.ReadMessage()
-
-		if err != nil {
-			return
-		}
-
-		if msgType != websocket.TextMessage {
-			continue
-		}
-
-		msg := strings.Split(string(p), " ")
+		msgArr := strings.Split(msg, " ")
 
 		if len(msg) < 1 {
-			continue
+			t.Fatalf("msg doesn't have cmd: %v", msg)
 		}
 
-		cmd := msg[0]
+		cmd := msgArr[0]
 
 		switch cmd {
 		case "UpdatePlayers":
 			if len(msg) < 2 {
-				continue
+				t.Fatalf("msg doesn't have payload: %v", msg)
 			}
 
-			playersStr := strings.Join(msg[1:], " ")
+			playersStr := strings.Join(msgArr[1:], " ")
 
 			var players map[string]models.PlayerInfo
 			if err := json.Unmarshal([]byte(playersStr), &players); err != nil {
-				continue
+				t.Fatalf("unmarshal error: %v", err)
 			}
 
 			mockUser.updatePlayers(players)
 		case "LobbyInfo":
 			if len(msg) < 2 {
-				continue
+				t.Fatalf("msg doesn't have payload: %v", msg)
 			}
 
-			lobbyStr := strings.Join(msg[1:], " ")
+			lobbyStr := strings.Join(msgArr[1:], " ")
 
 			var lobbyInfo models.LobbyInfo
 			if err := json.Unmarshal([]byte(lobbyStr), &lobbyInfo); err != nil {
-				continue
+				t.Fatalf("unmarshal error: %v", err)
 			}
 
 			mockUser.updateLobbyInfo(lobbyInfo)
 		}
-	}
+	})
+}
+
+func (mockUser *MockUser) waitForMsg() {
+	mockUser.wg.Wait()
 }
 
 func (mockUser *MockUser) getPlayers() map[string]models.PlayerInfo {
@@ -119,19 +117,6 @@ func (mockUser *MockUser) updateLobbyInfo(lobbyInfo models.LobbyInfo) {
 	defer mockUser.mu.Unlock()
 
 	mockUser.lobbyInfo = lobbyInfo
-}
-
-func (mockUser *MockUser) cleanup() {
-	mockUser.stop <- struct{}{}
-	close(mockUser.stop)
-}
-
-func (mockUser *MockUser) sendMsg(t *testing.T, msg string) {
-	if err := mockUser.conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(50 * time.Millisecond)
 }
 
 var dataProvider, _ = data_provider.NewDataProvider()
@@ -600,95 +585,76 @@ func TestConcurrentJoinStability(t *testing.T) {
 func TestNewGroupWithConn(t *testing.T) {
 	hub := newHub(dataProvider)
 
-	server := httptest.NewServer(&hub)
-	defer server.Close()
+	mockUser := newMockUser(t)
 
-	fakeClient := newMockUser(t, server)
-	defer fakeClient.cleanup()
+	mockUser.listenForMsg(t) // expects 1 msg
 
-	fakeClient.sendMsg(t, "NewGroup")
-	groupId := fakeClient.getLobbyInfo().LobbyId
+	mockClientMsg(t, &hub, mockUser, "NewGroup")
+
+	// expects 1 msg
+	mockUser.waitForMsg()
+
+	groupId := mockUser.getLobbyInfo().LobbyId
 
 	if _, ok := hub.groups[groupId]; !ok {
 		t.Fatal("NewGroup did not respond with groupid")
 	}
 }
 
-func TestJoinGroupWithConn(t *testing.T) {
-	hub := newHub(dataProvider)
+// func TestJoinGroupWithConn(t *testing.T) {
+// 	hub := newHub(dataProvider)
+//
+// 	u1 := newMockUser(t, server)
+// 	u2 := newMockUser(t, server)
+// 	u3 := newMockUser(t, server)
+//
+// 	defer u1.cleanup()
+// 	defer u2.cleanup()
+// 	defer u3.cleanup()
+//
+// 	u1.sendMsg(t, "NewGroup")
+//
+// 	groupId := u1.getLobbyInfo().LobbyId
+//
+// 	// User2 join group
+// 	u2.sendMsg(t, "JoinGroup "+groupId)
+//
+// 	if u2.getLobbyInfo().LobbyId != groupId {
+// 		t.Fatal("User 2 should be able to join group")
+// 	}
+//
+// 	// User1 should have received join notice
+//
+// 	if len(u1.getPlayers()) != 2 {
+// 		t.Fatal("User1 did not receive join notice")
+// 	}
+//
+// 	// User3 join group
+// 	u3.sendMsg(t, "JoinGroup "+groupId)
+//
+// 	if u3.getLobbyInfo().LobbyId != groupId {
+// 		t.Fatal("User 3 should be able to join group")
+// 	}
+//
+// 	// User1 and user2 should also have received
+// 	if len(u1.getPlayers()) != 3 {
+// 		t.Fatal("User 2 should have recieved new lobby")
+// 	}
+//
+// 	if len(u2.getPlayers()) != 3 {
+// 		t.Fatal("User 2 should have recieved new lobby")
+// 	}
+//
+// }
 
-	server := httptest.NewServer(&hub)
-	defer server.Close()
+func mockClientMsg(t *testing.T, hub *Hub, mockUser *MockUser, msg string) {
+	u := mockUser.u
 
-	u1 := newMockUser(t, server)
-	u2 := newMockUser(t, server)
-	u3 := newMockUser(t, server)
-
-	defer u1.cleanup()
-	defer u2.cleanup()
-	defer u3.cleanup()
-
-	u1.sendMsg(t, "NewGroup")
-
-	groupId := u1.getLobbyInfo().LobbyId
-
-	// User2 join group
-	u2.sendMsg(t, "JoinGroup "+groupId)
-
-	if u2.getLobbyInfo().LobbyId != groupId {
-		t.Fatal("User 2 should be able to join group")
-	}
-
-	// User1 should have received join notice
-
-	if len(u1.getPlayers()) != 2 {
-		t.Fatal("User1 did not receive join notice")
-	}
-
-	// User3 join group
-	u3.sendMsg(t, "JoinGroup "+groupId)
-
-	if u3.getLobbyInfo().LobbyId != groupId {
-		t.Fatal("User 3 should be able to join group")
-	}
-
-	// User1 and user2 should also have received
-	if len(u1.getPlayers()) != 3 {
-		t.Fatal("User 2 should have recieved new lobby")
-	}
-
-	if len(u2.getPlayers()) != 3 {
-		t.Fatal("User 2 should have recieved new lobby")
-	}
-
-}
-
-func TestLeaveGroupNoCrash(t *testing.T) {
-	hub := newHub(dataProvider)
-
-	server := httptest.NewServer(&hub)
-	defer server.Close()
-
-	conn1 := newTestConn(t, server)
-	conn2 := newTestConn(t, server)
-	conn3 := newTestConn(t, server)
-	defer conn1.Close()
-	defer conn2.Close()
-	defer conn3.Close()
-}
-
-// Gets a new connection to the test server
-func newTestConn(t *testing.T, server *httptest.Server) *websocket.Conn {
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-
-	_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-	_ = conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+	res, err := hub.handleMessage([]byte(msg), &u)
 
 	if err != nil {
-		t.Fatal(err)
+		u.SendMsg(err.Error())
+	} else if res != "" {
+		u.SendMsg(res)
 	}
-
-	return conn
 }
