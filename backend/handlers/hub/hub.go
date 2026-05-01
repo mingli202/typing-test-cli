@@ -60,6 +60,8 @@ func (hub *Hub) handleLeave(u *user.User) bool {
 		isEmpty := group.RemoveUser(u)
 		if isEmpty {
 			delete(hub.groups, *groupId)
+		} else {
+			group.SendUpdatePlayers()
 		}
 
 		return true
@@ -207,7 +209,7 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 	msg := string(p)
 	words := strings.Split(msg, " ")
 
-	log.Println(msg)
+	// log.Println(msg)
 
 	function := words[0]
 
