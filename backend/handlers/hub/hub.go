@@ -163,9 +163,9 @@ func (hub *Hub) newGroup() *group.Group {
 	data, _ := hub.dataProvider.NewData()
 
 	group := group.NewGroup(id, data)
-	hub.groups[group.Id()] = &group
+	hub.groups[group.Id()] = group
 
-	return &group
+	return group
 }
 
 // Gets the group of the user

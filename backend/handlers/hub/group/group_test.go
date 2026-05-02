@@ -15,7 +15,7 @@ func newGroup() *Group {
 	data, _ := dataProvider.NewData()
 	group := NewGroup("asdf", data)
 
-	return &group
+	return group
 }
 
 func TestNewGroup(t *testing.T) {

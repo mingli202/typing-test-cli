@@ -37,8 +37,8 @@ func (group *Group) Id() string {
 }
 
 // Makes a new group with the given id and data
-func NewGroup(id string, data models.Data) Group {
-	return Group{
+func NewGroup(id string, data models.Data) *Group {
+	group := Group{
 		id:         id,
 		users:      make(map[string]*user.User),
 		data:       data,
@@ -46,6 +46,8 @@ func NewGroup(id string, data models.Data) Group {
 		status:     Waiting,
 		end:        make(chan struct{}, 1),
 	}
+
+	return &group
 }
 
 // Adds the given user to this group
