@@ -224,8 +224,8 @@ func TestManyExitWhileGameNotStarted(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
+	done := make(chan struct{})
 	timer := time.NewTimer(500 * time.Millisecond)
-	didFinish := false
 
 	// Act
 	go func() {
@@ -234,16 +234,17 @@ func TestManyExitWhileGameNotStarted(t *testing.T) {
 		gr.RemoveUser(&u3)
 		gr.RemoveUser(&u3)
 		gr.RemoveUser(&u3)
-		didFinish = true
-		timer.Stop()
+		done <- struct{}{}
 	}()
 
 	// Assert
-	<-timer.C
-
-	if !didFinish {
+	select {
+	case <-timer.C:
 		t.Fatal("Remove user is taking too long")
+	case <-done:
+		return
 	}
+
 }
 
 func TestCountDown(t *testing.T) {
