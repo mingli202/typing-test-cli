@@ -61,7 +61,7 @@ func (hub *Hub) handleLeave(u *user.User) bool {
 		if isEmpty {
 			delete(hub.groups, *groupId)
 		} else {
-			defer group.SendUpdatePlayers()
+			go group.SendUpdatePlayers()
 		}
 
 		return true
