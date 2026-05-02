@@ -163,15 +163,15 @@ func (group *Group) SendUpdatePlayers() bool {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
-	progress := group.getProgressSnapshotLocked()
-	progressBytes, err := json.Marshal(progress)
+	playerInfo := group.getPlayerInfoSnapshotLocked()
+	playerInfoBytes, err := json.Marshal(playerInfo)
 
 	if err != nil {
 		log.Println(err)
 		return false
 	}
 
-	return group.broadcastLocked("UpdatePlayers " + string(progressBytes))
+	return group.broadcastLocked("UpdatePlayers " + string(playerInfoBytes))
 }
 
 // Broadcast the given message to the given slice of users
@@ -291,35 +291,35 @@ func (group *Group) startGame() {
 
 // Show the end game screen
 func (group *Group) endGame() {
-	progress := group.getProgressSnapshot()
-	progressBytes, err := json.Marshal(progress)
+	playerInfo := group.getPlayerInfoSnapshot()
+	PlayerInfoBytes, err := json.Marshal(playerInfo)
 
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	group.broadcast("EndGameResult " + string(progressBytes))
+	group.broadcast("EndGameResult " + string(PlayerInfoBytes))
 }
 
-// Gets a snapshot of the progress
-func (group *Group) getProgressSnapshot() map[string]models.PlayerInfo {
+// Gets a snapshot of the playerInfo
+func (group *Group) getPlayerInfoSnapshot() map[string]models.PlayerInfo {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
-	return group.getProgressSnapshotLocked()
+	return group.getPlayerInfoSnapshotLocked()
 }
 
-// Gets a snapshot of the progress
+// Gets a snapshot of the playerInfo
 // Assumes mutex is acquired
-func (group *Group) getProgressSnapshotLocked() map[string]models.PlayerInfo {
-	progress := make(map[string]models.PlayerInfo)
+func (group *Group) getPlayerInfoSnapshotLocked() map[string]models.PlayerInfo {
+	playerInfo := make(map[string]models.PlayerInfo)
 
 	for k, v := range group.playerInfo {
-		progress[k] = *v
+		playerInfo[k] = *v
 	}
 
-	return progress
+	return playerInfo
 }
 
 // Sets isGameRunning to true
@@ -363,8 +363,8 @@ func (group *Group) isGameCompleted() bool {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
-	for _, progress := range group.playerInfo {
-		if progress.ProgressPercent < 100 {
+	for _, playerInfo := range group.playerInfo {
+		if playerInfo.ProgressPercent < 100 {
 			return false
 		}
 	}
