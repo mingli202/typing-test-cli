@@ -277,7 +277,9 @@ func (group *Group) countDown() {
 
 // Starts the game and broadcasts updates every 1 second
 func (group *Group) startGame() {
-	group.setGameRunning()
+	if !group.setGameRunning() {
+		return
+	}
 
 	minWpm := 30
 	nWords := len(strings.Split(group.data.Text, " "))
@@ -336,19 +338,32 @@ func (group *Group) getPlayerInfoSnapshotLocked() map[string]models.PlayerInfo {
 }
 
 // Sets isGameRunning to true
-func (group *Group) setGameRunning() {
+// Returns if it was successful
+func (group *Group) setGameRunning() bool {
 	group.mu.Lock()
 	defer group.mu.Unlock()
 
-	group.status = Playing
+	if group.status != Playing {
+		group.status = Playing
+		return true
+	}
+
+	return false
 }
 
 // Sets isGameRunning to false
-func (group *Group) endGameRunning() {
+// Returns of it was successful
+func (group *Group) endGameRunning() bool {
 	group.mu.Lock()
 	defer group.mu.Unlock()
 
+	if group.status != Playing {
+		return false
+	}
+
 	group.status = End
+
+	return true
 }
 
 // Sets a new leader
