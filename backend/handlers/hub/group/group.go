@@ -13,14 +13,22 @@ import (
 	"tui/backend/models"
 )
 
+type GameStatus int
+
+const (
+	Waiting GameStatus = iota
+	Playing
+	End
+)
+
 type Group struct {
-	mu            sync.RWMutex
-	id            string
-	users         map[string]*user.User
-	leaderId      *string
-	data          models.Data
-	playerInfo    map[string]*models.PlayerInfo
-	isGameRunning bool
+	mu         sync.RWMutex
+	id         string
+	users      map[string]*user.User
+	leaderId   *string
+	data       models.Data
+	playerInfo map[string]*models.PlayerInfo
+	status     GameStatus
 }
 
 func (group *Group) Id() string {
@@ -30,11 +38,11 @@ func (group *Group) Id() string {
 // Makes a new group with the given id and data
 func NewGroup(id string, data models.Data) Group {
 	return Group{
-		id:            id,
-		users:         make(map[string]*user.User),
-		data:          data,
-		playerInfo:    make(map[string]*models.PlayerInfo),
-		isGameRunning: false,
+		id:         id,
+		users:      make(map[string]*user.User),
+		data:       data,
+		playerInfo: make(map[string]*models.PlayerInfo),
+		status:     Waiting,
 	}
 }
 
@@ -52,7 +60,7 @@ func (group *Group) AddUser(u *user.User) {
 		group.newLeader()
 	}
 
-	if !group.isGameRunning {
+	if group.status != Waiting {
 		group.playerInfo[u.Id()] = &models.PlayerInfo{
 			IsLeader: *group.leaderId == u.Id(),
 		}
@@ -114,7 +122,7 @@ func (group *Group) UpdateStats(u *user.User, wpm float64, progressPercent uint8
 	group.mu.Lock()
 	defer group.mu.Unlock()
 
-	if !group.isGameRunning {
+	if group.status != Playing {
 		return fmt.Errorf("Game is not running!")
 	}
 
@@ -327,7 +335,7 @@ func (group *Group) setGameRunning() {
 	group.mu.Lock()
 	defer group.mu.Unlock()
 
-	group.isGameRunning = true
+	group.status = Playing
 }
 
 // Sets isGameRunning to false
@@ -335,7 +343,7 @@ func (group *Group) endGameRunning() {
 	group.mu.Lock()
 	defer group.mu.Unlock()
 
-	group.isGameRunning = false
+	group.status = End
 }
 
 // Sets a new leader
