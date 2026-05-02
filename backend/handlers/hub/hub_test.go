@@ -16,6 +16,9 @@ import (
 	"tui/backend/services/data_provider"
 )
 
+var dataProviderNoRef, _ = data_provider.NewDataProvider()
+var dataProvider = &dataProviderNoRef
+
 // A mock client
 type MockClient struct {
 	mu        sync.Mutex
@@ -121,8 +124,6 @@ func (mockClient *MockClient) updateLobbyInfo(lobbyInfo models.LobbyInfo) {
 
 	mockClient.lobbyInfo = lobbyInfo
 }
-
-var dataProvider, _ = data_provider.NewDataProvider()
 
 func TestNewGroupId(t *testing.T) {
 	groupId := newGroupId()
