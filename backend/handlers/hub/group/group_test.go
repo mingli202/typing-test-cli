@@ -1,19 +1,21 @@
 package group
 
 import (
+	"encoding/json"
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 	"tui/backend/handlers/hub/user"
+	"tui/backend/models"
 	"tui/backend/services/data_provider"
 )
 
 var dataProvider, _ = data_provider.NewDataProvider()
 
 func newGroup() *Group {
-	data, _ := dataProvider.NewData()
-	group := NewGroup("asdf", data)
+	group := NewGroup("asdf", &dataProvider)
 
 	return group
 }
@@ -398,9 +400,34 @@ func TestIsGameEndedWhenEveryoneLeft(t *testing.T) {
 
 func TestNewGameAfterGameEnds(t *testing.T) {
 	// Arrange
+	ch1 := make(chan []byte)
+	ch2 := make(chan []byte)
+	ch3 := make(chan []byte)
+
+	var msg1 string
+	var msg2 string
+	var msg3 string
+
+	go func() {
+		for {
+			select {
+			case p := <-ch1:
+				msg1 = string(p)
+			case p := <-ch2:
+				msg2 = string(p)
+			case p := <-ch3:
+				msg3 = string(p)
+			}
+		}
+	}()
+
 	u1 := user.NewUser(nil)
 	u2 := user.NewUser(nil)
 	u3 := user.NewUser(nil)
+
+	u1.SetCh(ch1)
+	u2.SetCh(ch2)
+	u3.SetCh(ch3)
 
 	gr := newGroup()
 
@@ -416,8 +443,53 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	gr.end <- struct{}{}
+	time.Sleep(10 * time.Millisecond)
+
+	gr.mu.RLock()
+	initialData := gr.data
+	gr.mu.RUnlock()
 	// Act
 	gr.UserStartGame(&u1)
 
+	time.Sleep(10 * time.Millisecond)
+
 	// Assert
+	gr.mu.RLock()
+	afterData := gr.data
+	gr.mu.RUnlock()
+
+	if initialData == afterData {
+		t.Fatal("Did not get new data or data is the same")
+	}
+
+	assertNewData := func(msg string) {
+		words := strings.Split(msg, " ")
+		cmd := words[0]
+		rest := strings.Join(words[1:], " ")
+
+		if cmd != "NewGame" {
+			t.Fatalf("Expected NewGame, go %v", cmd)
+		}
+
+		var newGame models.NewGame
+		err := json.Unmarshal([]byte(rest), &newGame)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if newGame.Data != afterData {
+			t.Fatal("Data received is different from internal state")
+		}
+
+		for _, playerInfo := range newGame.Players {
+			if playerInfo.ProgressPercent != 0 {
+				t.Fatal("ProgressPercent did not get reset")
+			}
+		}
+	}
+
+	assertNewData(msg1)
+	assertNewData(msg2)
+	assertNewData(msg3)
 }
