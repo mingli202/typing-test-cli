@@ -261,7 +261,7 @@ func TestCountDown(t *testing.T) {
 
 	go gr.countDown()
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Millisecond)
 
 	gr.AddUser(&u3)
 
@@ -271,7 +271,7 @@ func TestCountDown(t *testing.T) {
 		t.Fatal("Did not add user")
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Millisecond)
 
 	if gr.RemoveUser(&u1) || gr.RemoveUser(&u2) {
 		t.Fatal("Group should not be empty")
