@@ -57,6 +57,7 @@ func NewGroup(id string, dataProvider *data_provider.DataProvider) *Group {
 // Adds the given user to this group
 // Sets the given user's groupId to this group's id
 // There can be no duplicate users
+// If a game has already started, the user can still join the group, however, they won't be added to the playerInfo since they can't be part of the already running game. The user is added the the group.users so they can receive broadcast and spectate the already running game
 func (group *Group) AddUser(u *user.User) {
 	group.mu.Lock()
 	defer group.mu.Unlock()
