@@ -15,6 +15,11 @@ type PlayerInfo struct {
 	ProgressPercent uint8
 }
 
+type NewGame struct {
+	Data    Data
+	Players map[string]PlayerInfo
+}
+
 func (lobbyInfo LobbyInfo) ToMsg() (string, error) {
 	lobbyInfoStr, err := json.Marshal(lobbyInfo)
 
@@ -23,4 +28,14 @@ func (lobbyInfo LobbyInfo) ToMsg() (string, error) {
 	}
 
 	return "LobbyInfo " + string(lobbyInfoStr), nil
+}
+
+func (newGame NewGame) ToMsg() (string, error) {
+	p, err := json.Marshal(newGame)
+
+	if err != nil {
+		return "", err
+	}
+
+	return "NewGame " + string(p), nil
 }
