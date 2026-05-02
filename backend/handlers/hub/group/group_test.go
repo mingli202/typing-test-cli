@@ -404,6 +404,8 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 	ch2 := make(chan []byte)
 	ch3 := make(chan []byte)
 
+	done := make(chan struct{})
+
 	var msg1 string
 	var msg2 string
 	var msg3 string
@@ -411,6 +413,8 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 	go func() {
 		for {
 			select {
+			case <-done:
+				return
 			case p := <-ch1:
 				msg1 = string(p)
 			case p := <-ch2:
@@ -492,4 +496,6 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 	assertNewData(msg1)
 	assertNewData(msg2)
 	assertNewData(msg3)
+
+	done <- struct{}{}
 }
