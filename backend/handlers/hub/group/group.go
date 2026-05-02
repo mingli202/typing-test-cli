@@ -435,13 +435,10 @@ func (group *Group) resetPlayerInfo() {
 // Called when a new game is played after a game has already ended
 // Gets new data and tell the users about it
 func (group *Group) newGameIfAlreadyEnded() {
-	fmt.Println("newGameIfAlreadyEnded")
-
 	group.mu.Lock()
 	defer group.mu.Unlock()
 
 	if group.status == End {
-		fmt.Println("getting new data")
 		newData := group.data
 
 		for newData == group.data {
