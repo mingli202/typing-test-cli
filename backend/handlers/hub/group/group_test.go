@@ -304,3 +304,28 @@ func TestStartGameLeaveInTheMiddleChangeLeader(t *testing.T) {
 		t.Fatal("New leader not set")
 	}
 }
+
+func TestStartGameInMiddleOfGame(t *testing.T) {
+	// Arrange
+	u1 := user.NewUser(nil)
+	u2 := user.NewUser(nil)
+	u3 := user.NewUser(nil)
+
+	gr := newGroup()
+
+	gr.AddUser(&u1)
+	gr.AddUser(&u2)
+	gr.AddUser(&u3)
+
+	go gr.startGame()
+
+	time.Sleep(1 * time.Millisecond)
+
+	// Act
+	err := gr.UserStartGame(&u1)
+
+	// Assert
+	if err == nil {
+		t.Fatal("How come no error when starting a game that has already started")
+	}
+}
