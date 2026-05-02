@@ -524,6 +524,30 @@ func TestHandleMessageEmptyInput(t *testing.T) {
 	}
 }
 
+// Issue: stale/non-existent user.GroupId must not panic in getGroupOfUser.
+// Expected behavior is a regular error that includes the missing group id.
+func TestGetGroupOfUserMissingGroupDoesNotPanic(t *testing.T) {
+	hub := newHub(dataProvider)
+	u := user.NewUser(nil)
+	missingGroupId := "missing-group-id"
+	u.GroupId = &missingGroupId
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("getGroupOfUser should not panic for missing group, recovered: %v", recovered)
+		}
+	}()
+
+	_, err := hub.getGroupOfUser(&u)
+	if err == nil {
+		t.Fatal("expected missing group error")
+	}
+
+	if !strings.Contains(err.Error(), missingGroupId) {
+		t.Fatalf("expected error to include missing group id %q, got %q", missingGroupId, err.Error())
+	}
+}
+
 func TestConcurrentJoinStability(t *testing.T) {
 	hub := newHub(dataProvider)
 
