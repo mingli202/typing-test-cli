@@ -60,7 +60,7 @@ func (group *Group) AddUser(u *user.User) {
 		group.newLeader()
 	}
 
-	if group.status != Waiting {
+	if group.status != Playing {
 		group.playerInfo[u.Id()] = &models.PlayerInfo{
 			IsLeader: *group.leaderId == u.Id(),
 		}
@@ -136,11 +136,15 @@ func (group *Group) UpdateStats(u *user.User, wpm float64, progressPercent uint8
 
 // Starts the game
 func (group *Group) UserStartGame(u *user.User) error {
-	group.mu.Lock()
-	defer group.mu.Unlock()
+	group.mu.RLock()
+	defer group.mu.RUnlock()
 
 	if *group.leaderId != u.Id() {
 		return fmt.Errorf("Only the leader can start the game")
+	}
+
+	if group.status != Waiting && group.status != End {
+		return fmt.Errorf("Lobby is busy, cannot start")
 	}
 
 	go func() {
@@ -274,7 +278,6 @@ func (group *Group) countDown() {
 // Starts the game and broadcasts updates every 1 second
 func (group *Group) startGame() {
 	group.setGameRunning()
-	defer group.endGameRunning()
 
 	minWpm := 30
 	nWords := len(strings.Split(group.data.Text, " "))
@@ -307,6 +310,8 @@ func (group *Group) endGame() {
 		return
 	}
 
+	group.endGameRunning()
+	group.resetPlayerInfo()
 	group.broadcast("EndGameResult " + string(PlayerInfoBytes))
 }
 
@@ -378,4 +383,15 @@ func (group *Group) isGameCompleted() bool {
 	}
 
 	return true
+}
+
+// Resets the player info after game end
+func (group *Group) resetPlayerInfo() {
+	group.mu.Lock()
+	defer group.mu.Unlock()
+
+	for _, playerInfo := range group.playerInfo {
+		playerInfo.ProgressPercent = 0
+		playerInfo.Wpm = 0
+	}
 }
