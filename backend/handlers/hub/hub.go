@@ -176,7 +176,7 @@ func (hub *Hub) getGroupOfUser(u *user.User) (*group.Group, error) {
 	group, ok := hub.getGroup(*u.GroupId)
 
 	if !ok {
-		return nil, fmt.Errorf("Could not find any group with group id %s", group.Id())
+		return nil, fmt.Errorf("Could not find any group with group id %s", *u.GroupId)
 	}
 
 	return group, nil
