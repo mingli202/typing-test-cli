@@ -29,6 +29,7 @@ type Group struct {
 	data       models.Data
 	playerInfo map[string]*models.PlayerInfo
 	status     GameStatus
+	end        chan struct{}
 }
 
 func (group *Group) Id() string {
@@ -43,6 +44,7 @@ func NewGroup(id string, data models.Data) Group {
 		data:       data,
 		playerInfo: make(map[string]*models.PlayerInfo),
 		status:     Waiting,
+		end:        make(chan struct{}, 1),
 	}
 }
 
@@ -84,7 +86,13 @@ func (group *Group) RemoveUser(u *user.User) bool {
 
 	delete(group.playerInfo, userId)
 
-	return len(group.users) == 0
+	isEmpty := len(group.users) == 0
+
+	if isEmpty {
+		group.end <- struct{}{}
+	}
+
+	return isEmpty
 }
 
 // Gets a snapshot of the group's user ids
@@ -297,6 +305,8 @@ func (group *Group) startGame() {
 			}
 
 		case <-timer.C:
+			return
+		case <-group.end:
 			return
 		}
 	}
