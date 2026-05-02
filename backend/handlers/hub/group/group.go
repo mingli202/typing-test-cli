@@ -171,7 +171,7 @@ func (group *Group) SendUpdatePlayers() bool {
 		return false
 	}
 
-	return group.broadcast("UpdatePlayers " + string(progressBytes))
+	return group.broadcastLocked("UpdatePlayers " + string(progressBytes))
 }
 
 // Broadcast the given message to the given slice of users
@@ -214,12 +214,16 @@ func (group *Group) broadcast(msg string) bool {
 
 // Sends a message to every user of this group.
 // Assumes that the lock is already acquired
-func (group *Group) broadcastLocked(msg string) {
+func (group *Group) broadcastLocked(msg string) bool {
+	atLeastOne := false
+
 	for _, u := range group.users {
 		if u != nil {
+			atLeastOne = true
 			u.SendMsg(msg)
 		}
 	}
+	return atLeastOne
 }
 
 // avgWpm gets the average wpm of this group
