@@ -166,15 +166,28 @@ func (group *Group) UpdateStats(u *user.User, wpm float64, progressPercent uint8
 
 // Starts the game
 func (group *Group) UserStartGame(u *user.User) error {
-	if err := group.canUserStartGame(u); err != nil {
+	didMakeNewGame, err := func(gr *Group) (bool, error) {
+		gr.mu.Lock()
+		defer gr.mu.Unlock()
+
+		if err := gr.canUserStartGame(u); err != nil {
+			return false, err
+		}
+
+		didMakeNewGame := gr.newGameIfAlreadyEnded()
+
+		gr.status = CountDown
+
+		return didMakeNewGame, nil
+	}(group)
+
+	if err != nil {
 		return err
 	}
 
-	group.newGameIfAlreadyEnded()
-
-	group.mu.Lock()
-	group.status = CountDown
-	group.mu.Unlock()
+	if didMakeNewGame {
+		group.sendNewGame()
+	}
 
 	go func() {
 		group.countDown()
@@ -444,9 +457,8 @@ func (group *Group) resetPlayerInfo() {
 
 // Called when a new game is played after a game has already ended
 // Gets new data and tell the users about it
-func (group *Group) newGameIfAlreadyEnded() {
-	group.mu.Lock()
-
+// Return whether new data has been set
+func (group *Group) newGameIfAlreadyEnded() bool {
 	if group.status == End {
 		newData := group.data
 
@@ -458,31 +470,34 @@ func (group *Group) newGameIfAlreadyEnded() {
 
 		group.data = newData
 
-		group.mu.Unlock()
+		return true
+	}
 
-		newGame := models.NewGame{
-			Data:        newData,
-			PlayersInfo: group.getPlayerInfoSnapshot(),
-		}
+	return false
+}
 
-		msg, err := newGame.ToMsg()
+// Broadcast new game to users
+func (group *Group) sendNewGame() {
+	group.mu.RLock()
+	data := group.data
+	group.mu.RUnlock()
 
-		if err != nil {
-			return
-		}
+	newGame := models.NewGame{
+		Data:        data,
+		PlayersInfo: group.getPlayerInfoSnapshot(),
+	}
 
-		group.broadcast(msg)
+	msg, err := newGame.ToMsg()
+
+	if err != nil {
 		return
 	}
 
-	group.mu.Unlock()
+	group.broadcast(msg)
 }
 
 // well can the user start the game?
 func (group *Group) canUserStartGame(u *user.User) error {
-	group.mu.RLock()
-	defer group.mu.RUnlock()
-
 	if group.leaderId == nil || *group.leaderId != u.Id() {
 		return fmt.Errorf("Only the leader can start the game")
 	}
