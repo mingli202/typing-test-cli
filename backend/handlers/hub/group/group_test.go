@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"tui/backend/handlers/hub/user"
@@ -393,6 +394,8 @@ func TestIsGameEndedWhenEveryoneLeft(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Assert
+	gr.mu.RLock()
+	defer gr.mu.RUnlock()
 	if gr.status != End {
 		t.Fatal("Game not ended when everyone left")
 	}
@@ -406,6 +409,7 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 
 	done := make(chan struct{})
 
+	var msgMu sync.Mutex
 	var msg1 string
 	var msg2 string
 	var msg3 string
@@ -416,11 +420,17 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 			case <-done:
 				return
 			case p := <-ch1:
+				msgMu.Lock()
 				msg1 = string(p)
+				msgMu.Unlock()
 			case p := <-ch2:
+				msgMu.Lock()
 				msg2 = string(p)
+				msgMu.Unlock()
 			case p := <-ch3:
+				msgMu.Lock()
 				msg3 = string(p)
+				msgMu.Unlock()
 			}
 		}
 	}()
@@ -446,7 +456,9 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
+	gr.mu.RLock()
 	gr.end <- struct{}{}
+	gr.mu.RUnlock()
 	time.Sleep(10 * time.Millisecond)
 
 	gr.mu.RLock()
@@ -467,6 +479,8 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 	}
 
 	assertNewData := func(msg string) {
+		msgMu.Lock()
+		defer msgMu.Unlock()
 		words := strings.Split(msg, " ")
 		cmd := words[0]
 		rest := strings.Join(words[1:], " ")
