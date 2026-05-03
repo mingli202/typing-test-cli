@@ -1,6 +1,6 @@
 package models
 
 type Data struct {
-	Text   string
-	Source string
+	Text   string `json:"text"`
+	Source string `json:"source"`
 }

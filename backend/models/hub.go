@@ -3,27 +3,27 @@ package models
 import "encoding/json"
 
 type LobbyInfo struct {
-	LobbyId string
-	Data    Data
+	LobbyId string `json:"lobby_id"`
+	Data    Data   `json:"data"`
 }
 
 type PlayerInfo struct {
-	IsLeader bool
+	IsLeader bool `json:"is_leader"`
 	// The current wpm of the user, calculated by the tui client
-	Wpm float64
+	Wpm float64 `json:"wpm"`
 	// At which character the user is at
-	ProgressPercent uint8
+	ProgressPercent uint8 `json:"progress_percent"`
 }
 
 type PlayerInfoSnapshot struct {
-	LobbyId string
-	Version uint64
-	Players map[string]PlayerInfo
+	LobbyId string                `json:"lobby_id"`
+	Version uint64                `json:"version"`
+	Players map[string]PlayerInfo `json:"players"`
 }
 
 type NewGame struct {
-	Data        Data
-	PlayersInfo PlayerInfoSnapshot
+	Data        Data               `json:"data"`
+	PlayersInfo PlayerInfoSnapshot `json:"players_info"`
 }
 
 func (lobbyInfo LobbyInfo) ToMsg() (string, error) {
