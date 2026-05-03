@@ -292,7 +292,7 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := user.NewUser(conn)
-	go user.InitWriteMessageCh()
+	user.InitWriteMessageCh()
 
 	log.Printf("New user connected: %v\n", user.Id())
 

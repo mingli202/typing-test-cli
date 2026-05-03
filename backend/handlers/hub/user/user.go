@@ -48,18 +48,21 @@ func (user *User) SetCh(ch chan []byte) {
 // Init the buffered channel to listen for write messages
 func (user *User) InitWriteMessageCh() {
 	user.mu.Lock()
+	defer user.mu.Unlock()
+
 	user.ch = make(chan []byte)
-	user.mu.Unlock()
 
-	for p := range user.ch {
-		if user.conn == nil {
-			continue
-		}
+	go func() {
+		for p := range user.ch {
+			if user.conn == nil {
+				continue
+			}
 
-		if err := user.conn.WriteMessage(websocket.TextMessage, p); err != nil {
-			return
+			if err := user.conn.WriteMessage(websocket.TextMessage, p); err != nil {
+				return
+			}
 		}
-	}
+	}()
 }
 
 // Helper method to send a string of message
