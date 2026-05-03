@@ -17,6 +17,7 @@ pub mod action;
 pub mod args;
 mod model;
 mod msg;
+mod multiplayer;
 mod singleplayer;
 mod util;
 
