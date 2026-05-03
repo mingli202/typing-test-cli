@@ -45,6 +45,9 @@ func newMockClient() *MockClient {
 }
 
 func (mockClient *MockClient) close() {
+	mockClient.mu.Lock()
+	defer mockClient.mu.Unlock()
+
 	close(mockClient.ch)
 }
 
@@ -630,7 +633,7 @@ func TestNewGroupWithSync(t *testing.T) {
 		t.Fatal("NewGroup did not respond with groupid")
 	}
 
-	if len(mockClient.players) != 1 {
+	if len(mockClient.getPlayers()) != 1 {
 		t.Fatal("user1 did not get players notice")
 	}
 
@@ -657,22 +660,22 @@ func TestJoinGroupWithSync(t *testing.T) {
 
 	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
 
-	if len(mockClient1.players) != 2 {
+	if len(mockClient1.getPlayers()) != 2 {
 		t.Fatal("user1 did not receive player update")
 	}
-	if len(mockClient2.players) != 2 {
+	if len(mockClient2.getPlayers()) != 2 {
 		t.Fatal("user2 did not receive player update")
 	}
 
 	mockClientMsg(t, &hub, mockClient3, "JoinGroup "+groupId)
 
-	if len(mockClient1.players) != 3 {
+	if len(mockClient1.getPlayers()) != 3 {
 		t.Fatal("user1 did not receive player update")
 	}
-	if len(mockClient2.players) != 3 {
+	if len(mockClient2.getPlayers()) != 3 {
 		t.Fatal("user2 did not receive player update")
 	}
-	if len(mockClient3.players) != 3 {
+	if len(mockClient3.getPlayers()) != 3 {
 		t.Fatal("user3 did not receive player update")
 	}
 }
@@ -693,30 +696,30 @@ func TestLeaveGroupWithSync(t *testing.T) {
 
 	mockClientMsg(t, &hub, mockClient1, "NewGroup")
 
-	groupId := mockClient1.lobbyInfo.LobbyId
+	groupId := mockClient1.getLobbyInfo().LobbyId
 
 	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
 	mockClientMsg(t, &hub, mockClient3, "JoinGroup "+groupId)
 
 	// assert leader first
-	if !mockClient2.players[mockClient1.u.Id()].IsLeader {
+	if !mockClient2.getPlayers()[mockClient1.u.Id()].IsLeader {
 		t.Fatal("Leader is not user1")
 	}
 	mockClientMsg(t, &hub, mockClient1, "LeaveGroup")
 
-	if len(mockClient2.players) != 2 {
+	if len(mockClient2.getPlayers()) != 2 {
 		t.Fatal("user2 players did not get updated")
 	}
 
-	if len(mockClient3.players) != 2 {
+	if len(mockClient3.getPlayers()) != 2 {
 		t.Fatal("user3 players did not get updated")
 	}
 
-	if _, ok := mockClient3.players[mockClient1.u.Id()]; ok {
+	if _, ok := mockClient3.getPlayers()[mockClient1.u.Id()]; ok {
 		t.Fatal("user1 is still in players")
 	}
 
-	if !mockClient3.players[mockClient2.u.Id()].IsLeader && !mockClient3.players[mockClient3.u.Id()].IsLeader {
+	if !mockClient3.getPlayers()[mockClient2.u.Id()].IsLeader && !mockClient3.getPlayers()[mockClient3.u.Id()].IsLeader {
 		t.Fatal("none of the two players are the leader")
 	}
 }
@@ -737,7 +740,7 @@ func TestStressTestSync(t *testing.T) {
 
 	mockClientMsg(t, &hub, mockClient1, "NewGroup")
 
-	groupId := mockClient1.lobbyInfo.LobbyId
+	groupId := mockClient1.getLobbyInfo().LobbyId
 
 	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
 
@@ -764,13 +767,13 @@ func TestStressTestSync(t *testing.T) {
 	wg.Wait()
 
 	// in the end, number of players should not have changed
-	if len(mockClient1.players) != 3 {
+	if len(mockClient1.getPlayers()) != 3 {
 		t.Fatal("Number of players is not 3")
 	}
-	if len(mockClient2.players) != 3 {
+	if len(mockClient2.getPlayers()) != 3 {
 		t.Fatal("Number of players is not 3")
 	}
-	if len(mockClient3.players) != 3 {
+	if len(mockClient3.getPlayers()) != 3 {
 		t.Fatal("Number of players is not 3")
 	}
 }
