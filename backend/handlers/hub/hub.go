@@ -46,28 +46,20 @@ func (hub *Hub) handleNewGroup(u *user.User) (models.LobbyInfo, error) {
 // If the group has no users, remove the group from the repo
 // Otherwise, notify the users that a new user has joined
 // Returns whether the remove was successful or not
-func (hub *Hub) handleLeave(u *user.User) bool {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-
+func (hub *Hub) handleLeave(u *user.User) error {
 	if groupId := u.GroupId; groupId != nil {
-		group, ok := hub.groups[*groupId]
-
-		if !ok {
-			return false
+		if err := hub.leave(*groupId, u); err != nil {
+			return err
 		}
 
-		isEmpty := group.RemoveUser(u)
-		if isEmpty {
-			delete(hub.groups, *groupId)
-		} else {
-			go group.SendUpdatePlayers()
+		if group, ok := hub.getGroup(*groupId); ok {
+			group.SendUpdatePlayers()
 		}
 
-		return true
+		return nil
 	}
 
-	return false
+	return fmt.Errorf("User not in any group to leave")
 }
 
 // Appends the given conn to the group with the given id
@@ -185,6 +177,41 @@ func (hub *Hub) getGroupOfUser(u *user.User) (*group.Group, error) {
 	return group, nil
 }
 
+// Join and return an error if any
+func (hub *Hub) join(groupId string, u *user.User) error {
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+
+	group, ok := hub.groups[groupId]
+
+	if !ok {
+		return fmt.Errorf("Could not find group %v to join", groupId)
+	}
+
+	group.AddUser(u)
+
+	return nil
+}
+
+// Have the given user leave the given group
+func (hub *Hub) leave(groupId string, u *user.User) error {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	group, ok := hub.groups[groupId]
+
+	if !ok {
+		return fmt.Errorf("Did not find group to leave")
+	}
+
+	isEmpty := group.RemoveUser(u)
+	if isEmpty {
+		delete(hub.groups, groupId)
+	}
+
+	return nil
+}
+
 // TODO: Handles random matchmaking
 func (hub *Hub) handleMatch(u *user.User) {}
 
@@ -248,8 +275,8 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 		return str, nil
 
 	case "LeaveGroup":
-		success := hub.handleLeave(u)
-		return strconv.FormatBool(success), nil
+		err := hub.handleLeave(u)
+		return strconv.FormatBool(err == nil), err
 	case "Match":
 		return "", nil
 	case "UpdateStats":
