@@ -1,11 +1,14 @@
 package user
 
 import (
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
 type User struct {
+	mu         sync.Mutex
 	conn       *websocket.Conn
 	ch         chan []byte
 	id         string
@@ -29,13 +32,11 @@ func (user *User) AvgWpm() float64 {
 // Adds a user to its user repository
 // and returns the newly added user
 func NewUser(conn *websocket.Conn) User {
-	user := User{
+	return User{
 		conn:    conn,
 		id:      uuid.NewString(),
 		GroupId: nil,
 	}
-
-	return user
 }
 
 // Sets the user's channel
@@ -60,6 +61,9 @@ func (user *User) InitWriteMessageCh() {
 
 // Helper method to send a string of message
 func (user *User) SendMsg(msg string) {
+	user.mu.Lock()
+	defer user.mu.Unlock()
+
 	if user.ch != nil {
 		user.ch <- []byte(msg)
 	}
@@ -67,6 +71,9 @@ func (user *User) SendMsg(msg string) {
 
 // Close websocket connection and closes the ch
 func (user *User) Cleanup() {
+	user.mu.Lock()
+	defer user.mu.Unlock()
+
 	if user.conn != nil {
 		user.conn.Close()
 	}
