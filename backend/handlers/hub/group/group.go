@@ -326,7 +326,9 @@ func (group *Group) startGame() {
 
 // Show the end game screen
 func (group *Group) endGame() {
-	group.endGameRunning()
+	if !group.endGameRunning() {
+		return
+	}
 
 	playerInfo := group.getPlayerInfoSnapshot()
 	PlayerInfoBytes, err := json.Marshal(playerInfo)
