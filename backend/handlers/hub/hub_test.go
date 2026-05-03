@@ -130,6 +130,95 @@ func (mockClient *MockClient) updatePlayers(playerInfo models.PlayerInfoSnapshot
 
 }
 
+func TestMockClientUpdatePlayersIgnoresStaleAndDuplicateVersion(t *testing.T) {
+	mockClient := newMockClient()
+
+	freshPlayers := map[string]models.PlayerInfo{
+		"u-new": {IsLeader: true, Wpm: 70, ProgressPercent: 50},
+	}
+	stalePlayers := map[string]models.PlayerInfo{
+		"u-old": {IsLeader: false, Wpm: 10, ProgressPercent: 10},
+	}
+	duplicatePlayers := map[string]models.PlayerInfo{
+		"u-dup": {IsLeader: false, Wpm: 99, ProgressPercent: 99},
+	}
+
+	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+		Version: 3,
+		Players: freshPlayers,
+	})
+	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+		Version: 2,
+		Players: stalePlayers,
+	})
+	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+		Version: 3,
+		Players: duplicatePlayers,
+	})
+
+	got := mockClient.getPlayers()
+	if !maps.Equal(got, freshPlayers) {
+		t.Fatalf("stale/duplicate update should be ignored; got %+v want %+v", got, freshPlayers)
+	}
+}
+
+func TestMockClientUpdatePlayersAppliesNewerEmptySnapshot(t *testing.T) {
+	mockClient := newMockClient()
+
+	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+		Version: 4,
+		Players: map[string]models.PlayerInfo{
+			"u1": {IsLeader: true, Wpm: 60, ProgressPercent: 80},
+		},
+	})
+
+	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+		Version: 5,
+		Players: map[string]models.PlayerInfo{},
+	})
+
+	got := mockClient.getPlayers()
+	if len(got) != 0 {
+		t.Fatalf("expected newer empty snapshot to clear players, got %+v", got)
+	}
+}
+
+func TestMockClientHandleMsgOutOfOrderUpdatePlayers(t *testing.T) {
+	mockClient := newMockClient()
+
+	oldPayload, err := json.Marshal(models.PlayerInfoSnapshot{
+		Version: 7,
+		Players: map[string]models.PlayerInfo{
+			"u-old": {IsLeader: false, Wpm: 40, ProgressPercent: 40},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newPayload, err := json.Marshal(models.PlayerInfoSnapshot{
+		Version: 8,
+		Players: map[string]models.PlayerInfo{
+			"u-new": {IsLeader: true, Wpm: 85, ProgressPercent: 95},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mockClient.handleMsg(t, "UpdatePlayers "+string(newPayload))
+	mockClient.handleMsg(t, "UpdatePlayers "+string(oldPayload))
+
+	got := mockClient.getPlayers()
+	want := map[string]models.PlayerInfo{
+		"u-new": {IsLeader: true, Wpm: 85, ProgressPercent: 95},
+	}
+
+	if !maps.Equal(got, want) {
+		t.Fatalf("out-of-order message handling failed: got %+v want %+v", got, want)
+	}
+}
+
 func (mockClient *MockClient) updateLobbyInfo(lobbyInfo models.LobbyInfo) {
 	mockClient.mu.Lock()
 	defer mockClient.mu.Unlock()
