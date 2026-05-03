@@ -427,10 +427,14 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 
 	done := make(chan struct{})
 
-	var msgMu sync.Mutex
-	var msg1 string
-	var msg2 string
-	var msg3 string
+	type Msg struct {
+		mu  sync.Mutex
+		msg string
+	}
+
+	var msg1 Msg
+	var msg2 Msg
+	var msg3 Msg
 
 	go func() {
 		for {
@@ -438,17 +442,17 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 			case <-done:
 				return
 			case p := <-ch1:
-				msgMu.Lock()
-				msg1 = string(p)
-				msgMu.Unlock()
+				msg1.mu.Lock()
+				msg1.msg = string(p)
+				msg1.mu.Unlock()
 			case p := <-ch2:
-				msgMu.Lock()
-				msg2 = string(p)
-				msgMu.Unlock()
+				msg2.mu.Lock()
+				msg2.msg = string(p)
+				msg2.mu.Unlock()
 			case p := <-ch3:
-				msgMu.Lock()
-				msg3 = string(p)
-				msgMu.Unlock()
+				msg3.mu.Lock()
+				msg3.msg = string(p)
+				msg3.mu.Unlock()
 			}
 		}
 	}()
@@ -500,10 +504,11 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 		t.Fatal("Did not get new data or data is the same")
 	}
 
-	assertNewData := func(msg string) {
-		msgMu.Lock()
-		defer msgMu.Unlock()
-		words := strings.Split(msg, " ")
+	assertNewData := func(msg *Msg) {
+		msg.mu.Lock()
+		defer msg.mu.Unlock()
+
+		words := strings.Split(msg.msg, " ")
 		cmd := words[0]
 		rest := strings.Join(words[1:], " ")
 
@@ -529,9 +534,9 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 		}
 	}
 
-	assertNewData(msg1)
-	assertNewData(msg2)
-	assertNewData(msg3)
+	assertNewData(&msg1)
+	assertNewData(&msg2)
+	assertNewData(&msg3)
 
 	done <- struct{}{}
 }
