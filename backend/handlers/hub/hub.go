@@ -80,6 +80,7 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, erro
 	// but only if the joining was successful
 	if oldGroupId != nil {
 		hub.leaveLocked(*oldGroupId, u)
+		hub.notifyGroup(*oldGroupId)
 	}
 
 	group.AddUser(u)
