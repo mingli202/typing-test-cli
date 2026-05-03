@@ -15,9 +15,14 @@ type PlayerInfo struct {
 	ProgressPercent uint8
 }
 
-type NewGame struct {
-	Data    Data
+type PlayerInfoSnapshot struct {
+	Version uint64
 	Players map[string]PlayerInfo
+}
+
+type NewGame struct {
+	Data        Data
+	PlayersInfo PlayerInfoSnapshot
 }
 
 func (lobbyInfo LobbyInfo) ToMsg() (string, error) {

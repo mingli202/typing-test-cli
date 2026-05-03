@@ -24,15 +24,16 @@ const (
 )
 
 type Group struct {
-	mu           sync.RWMutex
-	id           string
-	users        map[string]*user.User
-	leaderId     *string
-	data         models.Data
-	dataProvider *data_provider.DataProvider
-	playerInfo   map[string]*models.PlayerInfo
-	status       GameStatus
-	end          chan struct{}
+	mu                sync.RWMutex
+	id                string
+	users             map[string]*user.User
+	leaderId          *string
+	data              models.Data
+	dataProvider      *data_provider.DataProvider
+	playerInfo        map[string]*models.PlayerInfo
+	playerInfoVersion uint64
+	status            GameStatus
+	end               chan struct{}
 }
 
 func (group *Group) Id() string {
@@ -75,6 +76,8 @@ func (group *Group) AddUser(u *user.User) {
 			IsLeader: *group.leaderId == u.Id(),
 		}
 	}
+
+	group.playerInfoVersion += 1
 }
 
 // Removes the given user to this grouptitle
@@ -92,6 +95,8 @@ func (group *Group) RemoveUser(u *user.User) bool {
 	}
 
 	delete(group.playerInfo, userId)
+
+	group.playerInfoVersion += 1
 
 	isEmpty := len(group.users) == 0
 	shouldEndGame := isEmpty && group.status == Playing
@@ -151,6 +156,8 @@ func (group *Group) UpdateStats(u *user.User, wpm float64, progressPercent uint8
 	if p, ok := group.playerInfo[u.Id()]; ok {
 		p.Wpm = wpm
 		p.ProgressPercent = progressPercent
+
+		group.playerInfoVersion += 1
 	}
 
 	return nil
@@ -195,17 +202,7 @@ func (group *Group) GetLobbyInfo() models.LobbyInfo {
 // Send UpdatePlayers msg
 // Returns whether at least one user was sent the message
 func (group *Group) SendUpdatePlayers() bool {
-	group.mu.RLock()
-	defer group.mu.RUnlock()
-
-	return group.SendUpdatePlayersLocked()
-}
-
-// Send UpdatePlayers msg
-// Returns whether at least one user was sent the message
-// Assumes the lock is acquired
-func (group *Group) SendUpdatePlayersLocked() bool {
-	playerInfo := group.getPlayerInfoSnapshotLocked()
+	playerInfo := group.getPlayerInfoSnapshot()
 	playerInfoBytes, err := json.Marshal(playerInfo)
 
 	if err != nil {
@@ -213,7 +210,9 @@ func (group *Group) SendUpdatePlayersLocked() bool {
 		return false
 	}
 
-	return group.broadcastLocked("UpdatePlayers " + string(playerInfoBytes))
+	msg := fmt.Sprintf("UpdatePlayers %v", string(playerInfoBytes))
+
+	return group.broadcast(msg)
 }
 
 // Broadcast the given message to the given slice of users
@@ -239,32 +238,17 @@ func (group *Group) broadcastToUserWithId(userIds []string, msg string) bool {
 // Sends a message to every user of this group
 // Returns if at least one user was send the given msg
 func (group *Group) broadcast(msg string) bool {
-	group.mu.RLock()
-	defer group.mu.RUnlock()
+	users := group.GetUsersSnapshot()
 
 	atLeastOne := false
 
-	for _, u := range group.users {
+	for _, u := range users {
 		if u != nil {
 			atLeastOne = true
 			u.SendMsg(msg)
 		}
 	}
 
-	return atLeastOne
-}
-
-// Sends a message to every user of this group.
-// Assumes that the lock is already acquired
-func (group *Group) broadcastLocked(msg string) bool {
-	atLeastOne := false
-
-	for _, u := range group.users {
-		if u != nil {
-			atLeastOne = true
-			u.SendMsg(msg)
-		}
-	}
 	return atLeastOne
 }
 
@@ -352,7 +336,7 @@ func (group *Group) endGame() {
 }
 
 // Gets a snapshot of the playerInfo
-func (group *Group) getPlayerInfoSnapshot() map[string]models.PlayerInfo {
+func (group *Group) getPlayerInfoSnapshot() models.PlayerInfoSnapshot {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
@@ -361,14 +345,18 @@ func (group *Group) getPlayerInfoSnapshot() map[string]models.PlayerInfo {
 
 // Gets a snapshot of the playerInfo
 // Assumes mutex is acquired
-func (group *Group) getPlayerInfoSnapshotLocked() map[string]models.PlayerInfo {
+func (group *Group) getPlayerInfoSnapshotLocked() models.PlayerInfoSnapshot {
+	v := group.playerInfoVersion
 	playerInfo := make(map[string]models.PlayerInfo)
 
 	for k, v := range group.playerInfo {
 		playerInfo[k] = *v
 	}
 
-	return playerInfo
+	return models.PlayerInfoSnapshot{
+		Version: v,
+		Players: playerInfo,
+	}
 }
 
 // Sets isGameRunning to true
@@ -448,13 +436,14 @@ func (group *Group) resetPlayerInfo() {
 			IsLeader: group.leaderId != nil && *group.leaderId == userId,
 		}
 	}
+
+	group.playerInfoVersion += 1
 }
 
 // Called when a new game is played after a game has already ended
 // Gets new data and tell the users about it
 func (group *Group) newGameIfAlreadyEnded() {
 	group.mu.Lock()
-	defer group.mu.Unlock()
 
 	if group.status == End {
 		newData := group.data
@@ -465,9 +454,11 @@ func (group *Group) newGameIfAlreadyEnded() {
 
 		group.data = newData
 
+		group.mu.Unlock()
+
 		newGame := models.NewGame{
-			Data:    newData,
-			Players: group.getPlayerInfoSnapshotLocked(),
+			Data:        newData,
+			PlayersInfo: group.getPlayerInfoSnapshotLocked(),
 		}
 
 		msg, err := newGame.ToMsg()
@@ -476,6 +467,9 @@ func (group *Group) newGameIfAlreadyEnded() {
 			return
 		}
 
-		group.broadcastLocked(msg)
+		group.broadcast(msg)
+		return
 	}
+
+	group.mu.Unlock()
 }

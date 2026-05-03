@@ -518,7 +518,7 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 			t.Fatal("Data received is different from internal state")
 		}
 
-		for _, playerInfo := range newGame.Players {
+		for _, playerInfo := range newGame.PlayersInfo.Players {
 			if playerInfo.ProgressPercent != 0 {
 				t.Fatal("ProgressPercent did not get reset")
 			}
@@ -559,7 +559,7 @@ func TestPlayerInfoUpdatedWithNewPlayerAfterGameEnds(t *testing.T) {
 		t.Fatal("user3 did not join")
 	}
 
-	playerInfo := gr.getPlayerInfoSnapshot()
+	playerInfo := gr.getPlayerInfoSnapshot().Players
 	if len(playerInfo) != 2 {
 		t.Fatalf("playerinfo is not 2, got %v", len(playerInfo))
 	}
@@ -572,7 +572,7 @@ func TestPlayerInfoUpdatedWithNewPlayerAfterGameEnds(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Assert
-	playerInfo = gr.getPlayerInfoSnapshot()
+	playerInfo = gr.getPlayerInfoSnapshot().Players
 	if len(playerInfo) != 3 {
 		t.Fatalf("playerinfo is not 3, got %v", len(playerInfo))
 	}
