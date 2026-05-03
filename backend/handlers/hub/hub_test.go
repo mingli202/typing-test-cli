@@ -537,7 +537,7 @@ func TestHandleLeaveWithoutGroup(t *testing.T) {
 	hub := newHub(dataProvider)
 	user := user.NewUser(nil)
 
-	if hub.handleLeave(&user) {
+	if hub.handleLeave(&user) == nil {
 		t.Fatal("leave should fail for user that is not in a group")
 	}
 }
@@ -558,7 +558,7 @@ func TestLeaveHelperMatchesHandleLeaveBehavior(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	success := hub.handleLeave(&user2)
+	success := hub.handleLeave(&user2) == nil
 
 	if !success {
 		t.Fatal("leave helper should remove a user that belongs to a group")
