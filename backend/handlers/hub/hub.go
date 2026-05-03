@@ -224,18 +224,6 @@ func (hub *Hub) leaveAndNotify(groupId string, u *user.User) error {
 	return nil
 }
 
-// Sends update players to the given group id
-// Returns if the group was found
-func (hub *Hub) notifyGroup(groupId string) bool {
-	group, ok := hub.getGroup(groupId)
-
-	if ok {
-		group.SendUpdatePlayers()
-	}
-
-	return ok
-}
-
 // TODO: Handles random matchmaking
 func (hub *Hub) handleMatch(u *user.User) {}
 
