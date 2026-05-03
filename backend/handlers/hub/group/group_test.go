@@ -532,6 +532,52 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 	done <- struct{}{}
 }
 
+func TestPlayerInfoUpdatedWithNewPlayerAfterGameEnds(t *testing.T) {
+	// Arrange
+	u1 := user.NewUser(nil)
+	u2 := user.NewUser(nil)
+	u3 := user.NewUser(nil)
+
+	gr := newGroup()
+
+	gr.AddUser(&u1)
+	gr.AddUser(&u2)
+
+	go func() {
+		gr.startGame()
+		gr.endGame()
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Act
+	// joins in middle of game
+	gr.AddUser(&u3)
+
+	userIds := gr.GetUserIdsSnapshot()
+	if len(userIds) != 3 {
+		t.Fatal("user3 did not join")
+	}
+
+	playerInfo := gr.getPlayerInfoSnapshot()
+	if len(playerInfo) != 2 {
+		t.Fatalf("playerinfo is not 2, got %v", len(playerInfo))
+	}
+
+	// ends the game
+	gr.mu.RLock()
+	gr.end <- struct{}{}
+	gr.mu.RUnlock()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Assert
+	playerInfo = gr.getPlayerInfoSnapshot()
+	if len(playerInfo) != 3 {
+		t.Fatalf("playerinfo is not 3, got %v", len(playerInfo))
+	}
+}
+
 // Issue: short texts used to compute near-zero/zero game timeout and ended immediately.
 // Regression expectation: even with a 1-word text, startGame should not end within 1 second.
 func TestStartGameMinimumDurationForShortText(t *testing.T) {
