@@ -305,8 +305,8 @@ func TestJoin(t *testing.T) {
 	// user joins itself
 	_, err = hub.handleJoin(groupId1, &user1)
 
-	if err != nil {
-		t.Fatal("Technically the user can in fact join its own group")
+	if err == nil {
+		t.Fatal("Joining itself should be an error, make the client aware of it")
 	}
 
 	// user 2 joins valid group
