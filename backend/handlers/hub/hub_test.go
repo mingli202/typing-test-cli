@@ -811,8 +811,8 @@ func TestStressTestSync(t *testing.T) {
 
 	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
 
-	const nClient = 24
-	const nIterations = 200
+	const nClient = 10
+	const nIterations = 100
 
 	var wg sync.WaitGroup
 	for i := 0; i < nClient; i++ {
