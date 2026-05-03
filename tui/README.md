@@ -1,4 +1,4 @@
-# Typing test tui
+# Typing test tui client
 
 Monkeytype inspired typing test tui in the terminal made in rust. Words and quotes are from my rust gui typing test repo
 
