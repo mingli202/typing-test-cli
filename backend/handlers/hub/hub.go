@@ -349,7 +349,7 @@ func newGroupId() string {
 	s := ""
 
 	for i := 0; i < 6; i += 1 {
-		randomChar := rand.IntN('z'-'a') + 'a'
+		randomChar := rand.IntN(26) + 'a'
 		s = s + string(rune(randomChar))
 	}
 
