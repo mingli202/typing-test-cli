@@ -25,13 +25,12 @@ var dataProvider = &dataProviderNoRef
 
 // A mock client
 type MockClient struct {
-	mu                sync.Mutex
-	playerInfoVersion uint64
-	players           map[string]models.PlayerInfo
-	lobbyInfo         models.LobbyInfo
-	u                 *user.User
-	ch                chan []byte
-	wg                sync.WaitGroup
+	mu          sync.Mutex
+	playersInfo models.PlayerInfoSnapshot
+	lobbyInfo   models.LobbyInfo
+	u           *user.User
+	ch          chan []byte
+	wg          sync.WaitGroup
 }
 
 func newMockClient() *MockClient {
@@ -109,7 +108,7 @@ func (mockClient *MockClient) getPlayers() map[string]models.PlayerInfo {
 	mockClient.mu.Lock()
 	defer mockClient.mu.Unlock()
 
-	return maps.Clone(mockClient.players)
+	return maps.Clone(mockClient.playersInfo.Players)
 }
 
 func (mockClient *MockClient) getLobbyInfo() models.LobbyInfo {
@@ -123,9 +122,11 @@ func (mockClient *MockClient) updatePlayers(playerInfo models.PlayerInfoSnapshot
 	mockClient.mu.Lock()
 	defer mockClient.mu.Unlock()
 
-	if playerInfo.Version > mockClient.playerInfoVersion {
-		mockClient.players = playerInfo.Players
-		mockClient.playerInfoVersion = playerInfo.Version
+	isSameLobby := playerInfo.LobbyId == mockClient.playersInfo.LobbyId
+	isNewerPlayerInfoVersion := playerInfo.Version > mockClient.playersInfo.Version
+
+	if !isSameLobby || isNewerPlayerInfoVersion {
+		mockClient.playersInfo = playerInfo
 	}
 
 }
@@ -946,6 +947,35 @@ func TestStressTestSync(t *testing.T) {
 	}
 	if len(mockClient3.getPlayers()) != 3 {
 		t.Fatal("Number of players is not 3")
+	}
+}
+
+func TestJoiningNewGroupWithLowerPlayerinfoVersion(t *testing.T) {
+	// Arrange
+	hub := newHub(dataProvider)
+
+	mockClient1 := newMockClient()
+	mockClient2 := newMockClient()
+
+	mockClient1.listen(t)
+	mockClient2.listen(t)
+	defer mockClient1.close()
+	defer mockClient2.close()
+
+	mockClientMsg(t, &hub, mockClient1, "NewGroup")
+
+	groupId := mockClient1.getLobbyInfo().LobbyId
+
+	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
+
+	// Act
+	mockClientMsg(t, &hub, mockClient1, "NewGroup")
+
+	// Assert
+	players := mockClient1.getPlayers()
+
+	if len(players) != 1 {
+		t.Fatal("There should have been only 1 player in this new group")
 	}
 }
 
