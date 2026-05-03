@@ -155,7 +155,7 @@ func (group *Group) UserStartGame(u *user.User) error {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
-	if *group.leaderId != u.Id() {
+	if group.leaderId == nil || *group.leaderId != u.Id() {
 		return fmt.Errorf("Only the leader can start the game")
 	}
 
