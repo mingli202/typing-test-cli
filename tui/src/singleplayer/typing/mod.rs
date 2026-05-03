@@ -7,14 +7,11 @@ use ratatui::macros::{line, text};
 use ratatui::style::{Color, Stylize};
 use ratatui::widgets::Widget;
 
-use crate::util::data_provider::DataProvider;
-
 use self::mode_selection::ModeSelection;
 use self::typing::TypingTest;
 
 use super::action::Action;
-use super::endscreen::EndScreenModel;
-use super::{Mode, SharedModel, SinglePlayerScreen};
+use super::{Mode, SharedModel};
 
 mod letter;
 mod mode_selection;
@@ -24,7 +21,6 @@ mod word;
 pub enum Msg {
     Tick,
     Key(KeyCode),
-    UpdateMode(Mode),
 }
 
 #[derive(Debug, Default)]
@@ -55,7 +51,6 @@ impl TypingModel {
 pub fn update(
     typing_model: &mut TypingModel,
     shared_model: &mut SharedModel,
-    data_provider: &DataProvider,
     msg: Msg,
 ) -> Option<Action> {
     let TypingModel {
@@ -79,16 +74,17 @@ pub fn update(
                         shared_model.history.push((elapsed.as_secs_f64(), wpm));
                     }
 
-                    return Some(Action::SwitchScreen(SinglePlayerScreen::End(
-                        EndScreenModel::new(wpm, accuracy),
-                    )));
+                    return Some(Action::NewEndScreen {
+                        final_wpm: wpm,
+                        accuracy,
+                    });
                 }
             }
             KeyCode::Backspace => {
                 typing_test.on_backspace();
             }
             KeyCode::Tab => {
-                return Some(Action::new_typing_screen(shared_model, data_provider));
+                return Some(Action::NewTypingScreen);
             }
             KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
                 return handle_arrow_keys(selected_mode, shared_model, key);
@@ -109,7 +105,10 @@ pub fn update(
 
                     shared_model.history.push((elapsed.as_secs_f64(), wpm));
 
-                    return Some(Action::new_end_screen(wpm, accuracy));
+                    return Some(Action::NewEndScreen {
+                        final_wpm: wpm,
+                        accuracy,
+                    });
                 }
 
                 if stats_last_updated_time.elapsed() > Duration::from_secs(1) {
@@ -125,10 +124,6 @@ pub fn update(
 
                 stats.elapsed = elapsed
             }
-        }
-        Msg::UpdateMode(new_mode) => {
-            shared_model.mode = new_mode.clone();
-            return Some(Action::new_typing_screen(shared_model, data_provider));
         }
     };
 

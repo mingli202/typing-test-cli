@@ -62,11 +62,9 @@ pub fn update(
     msg: Msg,
 ) -> Option<crate::action::Action> {
     let mut maybe_action = match &mut model.screen {
-        SinglePlayerScreen::Typing(typing_model) => typing::Msg::from(msg).and_then(|msg| {
-            typing::update(typing_model, &mut model.shared_model, data_provider, msg)
-        }),
-        SinglePlayerScreen::End(_) => endscreen::Msg::from(msg)
-            .and_then(|msg| endscreen::update(&mut model.shared_model, data_provider, msg)),
+        SinglePlayerScreen::Typing(typing_model) => typing::Msg::from(msg)
+            .and_then(|msg| typing::update(typing_model, &mut model.shared_model, msg)),
+        SinglePlayerScreen::End(_) => endscreen::Msg::from(msg).and_then(endscreen::update),
     };
 
     while let Some(action) = maybe_action {
@@ -102,17 +100,25 @@ pub fn handle_action(
         action::Action::ModeChange(mode) => {
             model.shared_model.mode = mode.clone();
 
-            model.shared_model.history.clear();
-            model.shared_model.data = data_provider.get_data_from_mode(&model.shared_model.mode);
-            let text = &model.shared_model.data.text;
-
-            model.screen = SinglePlayerScreen::Typing(TypingModel::new(text, mode.clone()));
+            let _ = handle_action(model, data_provider, action::Action::NewTypingScreen);
 
             return Some(action::Action::Root(
                 crate::action::Action::ConfigModeUpdate(mode),
             ));
         }
-        action::Action::SwitchScreen(screen) => model.screen = screen,
+        action::Action::NewTypingScreen => {
+            model.shared_model.history.clear();
+            model.shared_model.data = data_provider.get_data_from_mode(&model.shared_model.mode);
+            let text = &model.shared_model.data.text;
+
+            let mode = model.shared_model.mode.clone();
+
+            model.screen = SinglePlayerScreen::Typing(TypingModel::new(text, mode));
+        }
+        action::Action::NewEndScreen {
+            final_wpm,
+            accuracy,
+        } => model.screen = SinglePlayerScreen::End(EndScreenModel::new(final_wpm, accuracy)),
         action::Action::Root(_) => return Some(action),
     }
 
