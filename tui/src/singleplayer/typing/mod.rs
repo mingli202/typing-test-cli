@@ -7,17 +7,18 @@ use ratatui::macros::{line, text};
 use ratatui::style::{Color, Stylize};
 use ratatui::widgets::Widget;
 
-use crate::action::Action;
-use crate::endscreen::EndScreenModel;
-use crate::model::{Mode, Screen, SharedModel};
 use crate::util::data_provider::DataProvider;
 
 use self::mode_selection::ModeSelection;
 use self::typing::TypingTest;
 
+use super::action::Action;
+use super::endscreen::EndScreenModel;
+use super::{Mode, SharedModel, SinglePlayerScreen};
+
 mod letter;
 mod mode_selection;
-mod typing;
+pub mod typing;
 mod word;
 
 pub enum Msg {
@@ -78,9 +79,9 @@ pub fn update(
                         shared_model.history.push((elapsed.as_secs_f64(), wpm));
                     }
 
-                    return Some(Action::SwitchScreen(Screen::End(EndScreenModel::new(
-                        wpm, accuracy,
-                    ))));
+                    return Some(Action::SwitchScreen(SinglePlayerScreen::End(
+                        EndScreenModel::new(wpm, accuracy),
+                    )));
                 }
             }
             KeyCode::Backspace => {

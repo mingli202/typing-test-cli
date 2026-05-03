@@ -1,7 +1,7 @@
 use crossterm::event::KeyEvent;
 
+use crate::singleplayer::{self, endscreen, typing};
 use crate::util::toast::ToastAction;
-use crate::{endscreen, typing};
 
 pub enum Msg {
     Tick,
@@ -9,7 +9,7 @@ pub enum Msg {
     ToastAction(ToastAction),
 }
 
-impl typing::Msg {
+impl singleplayer::typing::Msg {
     pub fn from(msg: Msg) -> Option<typing::Msg> {
         match msg {
             Msg::Tick => Some(typing::Msg::Tick),
@@ -19,7 +19,7 @@ impl typing::Msg {
     }
 }
 
-impl endscreen::Msg {
+impl singleplayer::endscreen::Msg {
     pub fn from(msg: Msg) -> Option<endscreen::Msg> {
         match msg {
             Msg::Key(key_event) => Some(endscreen::Msg::Key(key_event.code)),

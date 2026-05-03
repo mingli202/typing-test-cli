@@ -4,7 +4,7 @@ use std::fs;
 use rand::RngExt;
 use rand::seq::IndexedRandom;
 
-use crate::model::Mode;
+use crate::singleplayer::Mode;
 
 #[derive(Clone, Debug)]
 pub struct Data {
@@ -178,8 +178,7 @@ mod test {
         let data = provider.get_n_random_words(5);
 
         assert_eq!(
-            data.text,
-            "No words found",
+            data.text, "No words found",
             "empty datasets should use the fallback message"
         );
         assert_eq!(data.source, "No words found");
