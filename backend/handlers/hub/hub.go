@@ -332,6 +332,9 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 /* Stringer */
 func (hub *Hub) String() string {
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+
 	return fmt.Sprintf("Hub {\n    groups: %#v\n}", hub.groups)
 }
 
