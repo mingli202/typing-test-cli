@@ -265,8 +265,8 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 
 		progress, err := strconv.ParseInt(progressStr, 10, 8)
 
-		if err != nil {
-			return "", fmt.Errorf("<Progress> must be an int")
+		if err != nil || progress < 0 || progress > 100 {
+			return "", fmt.Errorf("<Progress> must be a positive int between 0 and 100")
 		}
 
 		err = hub.handleUpdateStats(u, wpm, uint8(progress))
