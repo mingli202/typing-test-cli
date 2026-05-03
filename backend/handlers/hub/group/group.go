@@ -286,10 +286,11 @@ func (group *Group) avgWpm() float64 {
 
 // Starts the countdown of 10 seconds, allows for joins and exits
 func (group *Group) countDown() {
-	ticker := time.Tick(time.Second * 1)
+	ticker := time.NewTicker(time.Second * 1)
+	defer ticker.Stop()
 	countdown := 10
 
-	for _ = range ticker {
+	for _ = range ticker.C {
 		group.broadcast(fmt.Sprintf("Countdown %v", countdown))
 		countdown -= 1
 
