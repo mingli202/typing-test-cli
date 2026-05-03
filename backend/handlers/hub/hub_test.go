@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,6 +16,8 @@ import (
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
+
+	"github.com/gorilla/websocket"
 )
 
 var dataProviderNoRef, _ = data_provider.NewDataProvider()
@@ -545,6 +549,48 @@ func TestHandleMessageUpdateStatsRejectsNegativeProgress(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "<Progress>") {
 		t.Fatalf("expected progress validation error, got: %v", err)
+	}
+}
+
+// Issue: ServeHTTP builds ErrorMessage on handler error but did not send it to clients.
+// Regression expectation: invalid commands should produce an "Error ..." websocket message.
+func TestServeHTTPSendsErrorMessageOnInvalidCommand(t *testing.T) {
+	h := Handler(dataProvider)
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Scheme = "ws"
+	u.Path = "/"
+
+	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	_, firstMsg, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(firstMsg), "UserId ") {
+		t.Fatalf("expected initial UserId message, got %q", string(firstMsg))
+	}
+
+	if err := conn.WriteMessage(websocket.TextMessage, []byte("JoinGroup")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, response, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.HasPrefix(string(response), "Error ") {
+		t.Fatalf("expected websocket error message, got %q", string(response))
 	}
 }
 
