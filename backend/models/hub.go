@@ -16,6 +16,7 @@ type PlayerInfo struct {
 }
 
 type PlayerInfoSnapshot struct {
+	LobbyId string
 	Version uint64
 	Players map[string]PlayerInfo
 }
