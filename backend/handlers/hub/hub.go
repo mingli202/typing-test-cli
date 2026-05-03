@@ -59,6 +59,9 @@ func (hub *Hub) handleLeave(u *user.User) error {
 // If successful, notify group that a new user has joined
 // Return the lobbyInfo on succesful join
 func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, error) {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
 	oldGroupId := u.GroupId
 	isJoiningSameGroup := oldGroupId != nil && *oldGroupId == groupId
 
@@ -67,7 +70,7 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, erro
 		return models.LobbyInfo{}, fmt.Errorf("How can you join the same group?")
 	}
 
-	err := hub.join(groupId, u)
+	group, err := hub.canJoinGroupLocked(groupId, u)
 
 	if err != nil {
 		return models.LobbyInfo{}, err
@@ -76,16 +79,14 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, erro
 	// leaves old group knowing that it's a different group (if any)
 	// but only if the joining was successful
 	if oldGroupId != nil {
-		hub.leaveAndNotify(*oldGroupId, u)
+		hub.leaveLocked(*oldGroupId, u)
 	}
 
-	if group, ok := hub.getGroup(groupId); ok {
-		group.SendUpdatePlayers()
+	group.AddUser(u)
 
-		return group.GetLobbyInfo(), nil
-	} else {
-		return models.LobbyInfo{}, fmt.Errorf("Could not find the group you just joined???")
-	}
+	group.SendUpdatePlayers()
+
+	return group.GetLobbyInfo(), nil
 }
 
 // Handles the updating of stats
@@ -176,28 +177,20 @@ func (hub *Hub) getGroupOfUser(u *user.User) (*group.Group, error) {
 	return group, nil
 }
 
-// Join and returns an error if the user failed to join the given group
-func (hub *Hub) join(groupId string, u *user.User) error {
-	hub.mu.RLock()
-	defer hub.mu.RUnlock()
-
+// Returns the group to be joined if it is possible
+func (hub *Hub) canJoinGroupLocked(groupId string, u *user.User) (*group.Group, error) {
 	group, ok := hub.groups[groupId]
 
 	if !ok {
-		return fmt.Errorf("Could not find group %v to join", groupId)
+		return nil, fmt.Errorf("Could not find group %v to join", groupId)
 	}
 
-	group.AddUser(u)
-
-	return nil
+	return group, nil
 }
 
-// Have the given user leave the given group
-// Returns an error if the user failed to leave the group
-func (hub *Hub) leave(groupId string, u *user.User) error {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-
+// Have the given user leaveLocked the given group
+// Returns an error if the user failed to leaveLocked the group
+func (hub *Hub) leaveLocked(groupId string, u *user.User) error {
 	group, ok := hub.groups[groupId]
 
 	if !ok {
@@ -215,15 +208,29 @@ func (hub *Hub) leave(groupId string, u *user.User) error {
 // Another helper function that handles notifying the group
 // Returns an error if the user failed to leave the group
 func (hub *Hub) leaveAndNotify(groupId string, u *user.User) error {
-	if err := hub.leave(groupId, u); err != nil {
+	hub.mu.Lock()
+	err := hub.leaveLocked(groupId, u)
+	hub.mu.Unlock()
+
+	if err != nil {
 		return err
 	}
 
-	if group, ok := hub.getGroup(groupId); ok {
+	hub.notifyGroup(groupId)
+
+	return nil
+}
+
+// Sends update players to the given group id
+// Returns if the group was found
+func (hub *Hub) notifyGroup(groupId string) bool {
+	group, ok := hub.getGroup(groupId)
+
+	if ok {
 		group.SendUpdatePlayers()
 	}
 
-	return nil
+	return ok
 }
 
 // TODO: Handles random matchmaking
