@@ -421,15 +421,15 @@ func TestIsGameEndedWhenEveryoneLeft(t *testing.T) {
 
 func TestNewGameAfterGameEnds(t *testing.T) {
 	// Arrange
-	ch1 := make(chan []byte)
-	ch2 := make(chan []byte)
-	ch3 := make(chan []byte)
+	ch1 := make(chan models.Message)
+	ch2 := make(chan models.Message)
+	ch3 := make(chan models.Message)
 
 	done := make(chan struct{})
 
 	type Msg struct {
 		mu  sync.Mutex
-		msg string
+		msg models.Message
 	}
 
 	var msg1 Msg
@@ -443,15 +443,15 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 				return
 			case p := <-ch1:
 				msg1.mu.Lock()
-				msg1.msg = string(p)
+				msg1.msg = p
 				msg1.mu.Unlock()
 			case p := <-ch2:
 				msg2.mu.Lock()
-				msg2.msg = string(p)
+				msg2.msg = p
 				msg2.mu.Unlock()
 			case p := <-ch3:
 				msg3.mu.Lock()
-				msg3.msg = string(p)
+				msg3.msg = p
 				msg3.mu.Unlock()
 			}
 		}
@@ -508,7 +508,13 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 		msg.mu.Lock()
 		defer msg.mu.Unlock()
 
-		words := strings.Split(msg.msg, " ")
+		str, errMsg := msg.msg.ToMsg()
+
+		if errMsg != nil {
+			t.Fatal(err)
+		}
+
+		words := strings.Split(str, " ")
 		cmd := words[0]
 		rest := strings.Join(words[1:], " ")
 
@@ -591,7 +597,7 @@ func TestPlayerInfoUpdatedWithNewPlayerAfterGameEnds(t *testing.T) {
 // Regression expectation: even with a 1-word text, startGame should not end within 1 second.
 func TestStartGameMinimumDurationForShortText(t *testing.T) {
 	u := user.NewUser(nil)
-	u.SetCh(make(chan []byte, 8))
+	u.SetCh(make(chan models.Message, 8))
 
 	gr := newGroup()
 	gr.data.Text = "short"
@@ -642,7 +648,7 @@ func TestStartGameMinimumDurationForShortText(t *testing.T) {
 func TestStartGameRepeatedRunsTerminateCleanly(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		u := user.NewUser(nil)
-		u.SetCh(make(chan []byte, 4))
+		u.SetCh(make(chan models.Message, 4))
 
 		gr := newGroup()
 		gr.AddUser(&u)
