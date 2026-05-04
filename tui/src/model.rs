@@ -4,6 +4,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::action::Action;
 pub use crate::msg::Msg;
+use crate::multiplayer::MultiplayerModel;
 use crate::singleplayer::SinglePlayerModel;
 use crate::util::config::{Config, ConfigUpdate};
 use crate::util::data_provider::DataProvider;
@@ -12,7 +13,7 @@ use crate::{CustomEvent, singleplayer};
 
 pub enum Screen {
     SinglePlayer(SinglePlayerModel),
-    Multiplayer,
+    Multiplayer(MultiplayerModel),
 }
 
 pub struct AppModel {
@@ -68,7 +69,7 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
                 Screen::SinglePlayer(singleplayer_model) => {
                     singleplayer::update(singleplayer_model, &model.data_provider, msg)
                 }
-                Screen::Multiplayer => None,
+                Screen::Multiplayer(_) => None,
             };
         }
     };
@@ -84,7 +85,7 @@ pub fn view(model: &AppModel, frame: &mut Frame) {
         Screen::SinglePlayer(singleplayer_model) => {
             singleplayer::view(singleplayer_model, area, buf)
         }
-        Screen::Multiplayer => {}
+        Screen::Multiplayer(_) => {}
     };
 
     toast::view(&model.toast, area, buf);
