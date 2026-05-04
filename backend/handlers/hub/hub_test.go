@@ -75,7 +75,7 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 	cmd := msgArr[0]
 
 	switch cmd {
-	case "UpdatePlayers":
+	case "PlayersInfo":
 		if len(msg) < 2 {
 			t.Fatalf("msg doesn't have payload: %v", msg)
 		}
