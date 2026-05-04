@@ -29,14 +29,14 @@ type MockClient struct {
 	playersInfo models.PlayerInfoSnapshot
 	lobbyInfo   models.LobbyInfo
 	u           *user.User
-	ch          chan []byte
+	ch          chan models.Message
 	wg          sync.WaitGroup
 }
 
 func newMockClient() *MockClient {
 	u := user.NewUser(nil)
 
-	ch := make(chan []byte)
+	ch := make(chan models.Message)
 
 	u.SetCh(ch)
 
@@ -57,10 +57,14 @@ func (mockClient *MockClient) close() {
 
 func (mockClient *MockClient) listen(t *testing.T) {
 	go func() {
-		for p := range mockClient.ch {
-			msg := string(p)
+		for msg := range mockClient.ch {
+			str, errMsg := msg.ToMsg()
 
-			mockClient.handleMsg(t, msg)
+			if errMsg != nil {
+				str, _ = models.ErrorMessage{Err: errMsg}.ToMsg()
+			}
+
+			mockClient.handleMsg(t, str)
 		}
 	}()
 }
@@ -387,7 +391,13 @@ func TestHandleMessageNewGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lobbyStr := strings.Join(strings.Split(res, " ")[1:], " ")
+	msgStr, errMsg := res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	lobbyStr := strings.Join(strings.Split(msgStr, " ")[1:], " ")
 
 	var lobby models.LobbyInfo
 	if err := json.Unmarshal([]byte(lobbyStr), &lobby); err != nil {
@@ -431,7 +441,13 @@ func TestHandleMessageJoinGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lobbyStr := strings.Join(strings.Split(res, " ")[1:], " ")
+	msgStr, errMsg := res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	lobbyStr := strings.Join(strings.Split(msgStr, " ")[1:], " ")
 
 	var joinLobby models.LobbyInfo
 	if err := json.Unmarshal([]byte(lobbyStr), &joinLobby); err != nil {
@@ -475,7 +491,13 @@ func TestHandleMessageLeaveGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	success, err := strconv.ParseBool(res)
+	msgStr, errMsg := res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	success, err := strconv.ParseBool(msgStr)
 
 	if err != nil {
 		t.Fatal(err)
@@ -492,7 +514,14 @@ func TestHandleMessageLeaveGroup(t *testing.T) {
 	}
 
 	res, _ = hub.handleMessage([]byte(msg), &user1)
-	success, _ = strconv.ParseBool(res)
+
+	msgStr, errMsg = res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	success, _ = strconv.ParseBool(msgStr)
 	if success == false {
 		t.Fatal("Unsuccessful leave")
 	}
@@ -985,8 +1014,8 @@ func mockClientMsg(t *testing.T, hub *Hub, mockUser *MockClient, msg string) {
 	res, err := hub.handleMessage([]byte(msg), u)
 
 	if err != nil {
-		u.SendMsg(err.Error())
-	} else if res != "" {
+		u.SendMsg(models.ErrorMessage{Err: err})
+	} else if res != nil {
 		u.SendMsg(res)
 	}
 
