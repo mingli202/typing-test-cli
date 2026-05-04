@@ -1,6 +1,9 @@
 package models
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type LobbyInfo struct {
 	LobbyId string `json:"lobby_id"`
@@ -24,6 +27,14 @@ type PlayerInfoSnapshot struct {
 type NewGame struct {
 	Data        Data               `json:"data"`
 	PlayersInfo PlayerInfoSnapshot `json:"players_info"`
+}
+
+type ErrorMessage struct {
+	Msg string
+}
+
+func (err ErrorMessage) ToMsg() string {
+	return fmt.Sprintf("Error %s", err.Msg)
 }
 
 func (lobbyInfo LobbyInfo) ToMsg() (string, error) {
