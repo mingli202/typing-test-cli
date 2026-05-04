@@ -271,7 +271,7 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (models.Message, error) {
 
 	case "LeaveGroup":
 		err := hub.handleLeave(u)
-		return models.LeaveGroupMessage{Success: err == nil}, nil
+		return models.LeaveGroupMessage{DidSucceed: err == nil}, nil
 	case "UpdateStats":
 		if len(words) != 3 {
 			return nil, fmt.Errorf("Format must be UpdateStates <Wpm> <Progress>")

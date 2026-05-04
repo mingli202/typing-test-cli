@@ -26,7 +26,7 @@ var dataProvider = &dataProviderNoRef
 // A mock client
 type MockClient struct {
 	mu          sync.Mutex
-	playersInfo models.PlayerInfoSnapshot
+	playersInfo models.PlayersInfoSnapshot
 	lobbyInfo   models.LobbyInfo
 	u           *user.User
 	ch          chan models.Message
@@ -86,7 +86,7 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 
 		playerInfoStr := strings.Join(msgArr[1:], " ")
 
-		var playerInfo models.PlayerInfoSnapshot
+		var playerInfo models.PlayersInfoSnapshot
 		if err := json.Unmarshal([]byte(playerInfoStr), &playerInfo); err != nil {
 			t.Fatalf("unmarshal error: %v", err)
 		}
@@ -122,7 +122,7 @@ func (mockClient *MockClient) getLobbyInfo() models.LobbyInfo {
 	return mockClient.lobbyInfo
 }
 
-func (mockClient *MockClient) updatePlayers(playerInfo models.PlayerInfoSnapshot) {
+func (mockClient *MockClient) updatePlayers(playerInfo models.PlayersInfoSnapshot) {
 	mockClient.mu.Lock()
 	defer mockClient.mu.Unlock()
 
@@ -148,15 +148,15 @@ func TestMockClientUpdatePlayersIgnoresStaleAndDuplicateVersion(t *testing.T) {
 		"u-dup": {IsLeader: false, Wpm: 99, ProgressPercent: 99},
 	}
 
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 3,
 		Players: freshPlayers,
 	})
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 2,
 		Players: stalePlayers,
 	})
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 3,
 		Players: duplicatePlayers,
 	})
@@ -170,14 +170,14 @@ func TestMockClientUpdatePlayersIgnoresStaleAndDuplicateVersion(t *testing.T) {
 func TestMockClientUpdatePlayersAppliesNewerEmptySnapshot(t *testing.T) {
 	mockClient := newMockClient()
 
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 4,
 		Players: map[string]models.PlayerInfo{
 			"u1": {IsLeader: true, Wpm: 60, ProgressPercent: 80},
 		},
 	})
 
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 5,
 		Players: map[string]models.PlayerInfo{},
 	})
@@ -191,7 +191,7 @@ func TestMockClientUpdatePlayersAppliesNewerEmptySnapshot(t *testing.T) {
 func TestMockClientHandleMsgOutOfOrderUpdatePlayers(t *testing.T) {
 	mockClient := newMockClient()
 
-	oldPayload, err := json.Marshal(models.PlayerInfoSnapshot{
+	oldPayload, err := json.Marshal(models.PlayersInfoSnapshot{
 		Version: 7,
 		Players: map[string]models.PlayerInfo{
 			"u-old": {IsLeader: false, Wpm: 40, ProgressPercent: 40},
@@ -201,7 +201,7 @@ func TestMockClientHandleMsgOutOfOrderUpdatePlayers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newPayload, err := json.Marshal(models.PlayerInfoSnapshot{
+	newPayload, err := json.Marshal(models.PlayersInfoSnapshot{
 		Version: 8,
 		Players: map[string]models.PlayerInfo{
 			"u-new": {IsLeader: true, Wpm: 85, ProgressPercent: 95},

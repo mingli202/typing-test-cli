@@ -323,7 +323,7 @@ func (group *Group) endGame() {
 }
 
 // Gets a snapshot of the playerInfo
-func (group *Group) getPlayerInfoSnapshot() models.PlayerInfoSnapshot {
+func (group *Group) getPlayerInfoSnapshot() models.PlayersInfoSnapshot {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
@@ -334,7 +334,7 @@ func (group *Group) getPlayerInfoSnapshot() models.PlayerInfoSnapshot {
 		playerInfo[k] = *v
 	}
 
-	return models.PlayerInfoSnapshot{
+	return models.PlayersInfoSnapshot{
 		LobbyId: group.id,
 		Version: v,
 		Players: playerInfo,
