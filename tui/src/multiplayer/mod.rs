@@ -1,11 +1,12 @@
 use std::sync::{Arc, RwLock};
 
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
 
 use crate::CustomEvent;
 use crate::util::toast::{self, ToastMessage};
@@ -15,29 +16,28 @@ use self::models::{LobbyInfo, NewGame, PlayerInfoSnapshot};
 mod models;
 
 pub struct SharedModel {
-    user_id: String,
-    player_info: PlayerInfoSnapshot,
-    lobby_info: LobbyInfo,
+    user_id: Option<String>,
+    player_info: Option<PlayerInfoSnapshot>,
+    lobby_info: Option<LobbyInfo>,
 }
 
 pub struct MultiplayerModel {
-    share_model: Arc<RwLock<SharedModel>>,
+    shared_model: Arc<RwLock<SharedModel>>,
     write_tx: UnboundedSender<String>,
-    read_rx: UnboundedReceiver<String>,
 }
 
 // Connects to the ws
-pub async fn connect_to_ws(event_tx: UnboundedSender<CustomEvent>) {
+pub async fn connect_to_ws(model: &mut MultiplayerModel, event_tx: UnboundedSender<CustomEvent>) {
     let request = "ws://localhost:8080/ws".into_client_request().unwrap();
 
     let (stream, _) = connect_async(request).await.unwrap();
+    let (mut write, mut read) = stream.split();
 
-    let (write, mut read) = stream.split();
+    let (write_tx, mut write_rx) = mpsc::unbounded_channel::<String>();
 
-    let (write_tx, write_rx) = mpsc::unbounded_channel::<String>();
-    let (read_tx, read_rx) = mpsc::unbounded_channel::<String>();
+    let shared_model = Arc::clone(&model.shared_model);
 
-    let handle: JoinHandle<color_eyre::Result<()>> = tokio::spawn(async move {
+    let read_handle: JoinHandle<color_eyre::Result<()>> = tokio::spawn(async move {
         while let Some(msg) = read.next().await {
             let msg = msg?;
 
@@ -46,10 +46,25 @@ pub async fn connect_to_ws(event_tx: UnboundedSender<CustomEvent>) {
             }
 
             let text = msg.to_text()?;
+
+            if let Err(err) = parse_ws_msg(text, Arc::clone(&shared_model)) {
+                let _ = toast::send(&event_tx, ToastMessage::error(err));
+            }
         }
 
         Ok(())
     });
+
+    let write_handle: JoinHandle<color_eyre::Result<()>> = tokio::spawn(async move {
+        while let Some(msg) = write_rx.recv().await {
+            let send_msg = Message::Text(Utf8Bytes::from(msg));
+            write.send(send_msg).await?;
+        }
+
+        Ok(())
+    });
+
+    model.write_tx = write_tx;
 }
 
 // parses the msg into the commands and execute them
@@ -66,18 +81,20 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
         "LobbyInfo" => {
             let lobby_info = parse_payload_json::<LobbyInfo>(&words)?;
             let mut lock = shared_model.write().unwrap();
-            lock.lobby_info = lobby_info;
+            lock.lobby_info = Some(lobby_info);
         }
         "NewGame" => {
             let new_game = parse_payload_json::<NewGame>(&words)?;
             let mut lock = shared_model.write().unwrap();
-            lock.lobby_info.data = new_game.data;
-            lock.player_info = new_game.players_info
+            if let Some(lobby_info) = &mut lock.lobby_info {
+                lobby_info.data = new_game.data;
+            }
+            lock.player_info = Some(new_game.players_info)
         }
         "EndGame" => {
             let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
             let mut lock = shared_model.write().unwrap();
-            lock.player_info = player_info;
+            lock.player_info = Some(player_info);
         }
         "Error" => {
             let msg = get_payload_from_words(&words)?;
@@ -86,12 +103,12 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
         "UserId" => {
             let user_id = get_payload_from_words(&words)?;
             let mut lock = shared_model.write().unwrap();
-            lock.user_id = user_id;
+            lock.user_id = Some(user_id);
         }
         "PlayersInfo" => {
             let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
             let mut lock = shared_model.write().unwrap();
-            lock.player_info = player_info;
+            lock.player_info = Some(player_info);
         }
         "Countdown" => {}
         _ => {}
