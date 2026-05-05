@@ -15,10 +15,19 @@ use self::models::{LobbyInfo, NewGame, PlayerInfoSnapshot};
 
 mod models;
 
+pub enum GameStatus {
+    Waiting,
+    Countdown(i8),
+    Playing,
+    End,
+}
+
+#[derive(Default)]
 pub struct SharedModel {
     user_id: Option<String>,
     player_info: Option<PlayerInfoSnapshot>,
     lobby_info: Option<LobbyInfo>,
+    game_status: Option<GameStatus>,
 }
 
 pub struct MultiplayerModel {
@@ -81,7 +90,9 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
         "LobbyInfo" => {
             let lobby_info = parse_payload_json::<LobbyInfo>(&words)?;
             let mut lock = shared_model.write().unwrap();
+
             lock.lobby_info = Some(lobby_info);
+            lock.game_status = Some(GameStatus::Waiting);
         }
         "NewGame" => {
             let new_game = parse_payload_json::<NewGame>(&words)?;
@@ -95,6 +106,7 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
             let mut lock = shared_model.write().unwrap();
             lock.player_info = Some(player_info);
+            lock.game_status = Some(GameStatus::End);
         }
         "Error" => {
             let msg = get_payload_from_words(&words)?;
@@ -110,7 +122,12 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             let mut lock = shared_model.write().unwrap();
             lock.player_info = Some(player_info);
         }
-        "Countdown" => {}
+        "Countdown" => {
+            let countdown = parse_payload_json::<i8>(&words)?;
+
+            let mut lock = shared_model.write().unwrap();
+            lock.game_status = Some(GameStatus::Countdown(countdown));
+        }
         _ => {}
     };
 
@@ -214,11 +231,7 @@ mod test {
 
     #[test]
     fn test_parse_ws_msg_lobby_info() {
-        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel {
-            user_id: None,
-            player_info: None,
-            lobby_info: None,
-        }));
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
 
         let json_str = json!({
             "lobby_id": "some-id",
@@ -246,11 +259,7 @@ mod test {
 
     #[test]
     fn test_parse_ws_msg_user_id() {
-        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel {
-            user_id: None,
-            player_info: None,
-            lobby_info: None,
-        }));
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
 
         assert_eq!(
             parse_ws_msg("UserId test-user-id", Arc::clone(&shared_model)),
