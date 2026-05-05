@@ -120,3 +120,78 @@ fn parse_payload_json<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, S
 
     serde_json::from_str::<T>(&payload).map_err(|err| err.to_string())
 }
+
+#[cfg(test)]
+mod test {
+    use crate::util::data_provider::Data;
+
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
+    #[test]
+    fn test_get_payload_from_words() {
+        let s = "cmd asdfasdf".split(" ").collect::<Vec<&str>>();
+
+        let res = get_payload_from_words(&s);
+
+        assert_eq!(res.is_ok(), true)
+    }
+
+    #[test]
+    fn test_get_payload_from_words_no_payload() {
+        let s = "cmd".split(" ").collect::<Vec<&str>>();
+
+        let res = get_payload_from_words(&s);
+
+        assert_eq!(res, Err("msg did not contain a payload".to_string()))
+    }
+
+    #[test]
+    fn test_get_payload_json() {
+        let json_str = json!({
+            "lobby_id": "some-id",
+            "data": {
+                "source": "test source",
+                "text": "test text"
+            }
+        })
+        .to_string();
+
+        let s = "cmd ".to_string() + &json_str;
+        let s = s.split(" ").collect::<Vec<&str>>();
+
+        let res = parse_payload_json::<LobbyInfo>(&s);
+
+        assert_eq!(
+            res,
+            Ok(LobbyInfo {
+                lobby_id: "some-id".to_string(),
+                data: Data {
+                    source: "test source".to_string(),
+                    text: "test text".to_string()
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_get_payload_json_wrong_format() {
+        let json_str = json!({
+            "lobby_id": "some-id",
+            "data": {
+                "source": "test source",
+                "wrong format": 123
+            }
+        })
+        .to_string();
+
+        let s = "cmd ".to_string() + &json_str;
+        let s = s.split(" ").collect::<Vec<&str>>();
+
+        let res = parse_payload_json::<LobbyInfo>(&s);
+        println!("res: {:?}", res);
+
+        assert_eq!(res.is_err(), true)
+    }
+}
