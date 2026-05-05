@@ -53,73 +53,70 @@ pub async fn connect_to_ws(event_tx: UnboundedSender<CustomEvent>) {
 }
 
 // parses the msg into the commands and execute them
-fn parse_ws_msg(
-    msg: &str,
-    shared_model: Arc<RwLock<SharedModel>>,
-    event_tx: UnboundedSender<CustomEvent>,
-) {
+fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(), String> {
     let words: Vec<&str> = msg.split(" ").collect();
 
     if words.is_empty() {
-        let _ = toast::send(
-            &event_tx,
-            ToastMessage::error("msg did not contain a cmd".to_string()),
-        );
-        return;
+        return Err("msg did not contain a cmd".to_string());
     }
 
     let cmd = words[0];
 
     match cmd {
-        "LobbyInfo" => match parse_payload_str::<LobbyInfo>(&words) {
-            Ok(lobby_info) => {
-                let mut lock = shared_model.write().unwrap();
-                lock.lobby_info = lobby_info;
-            }
-            Err(err) => {
-                let _ = toast::send(&event_tx, ToastMessage::error(err));
-            }
-        },
-        "NewGame" => match parse_payload_str::<NewGame>(&words) {
-            Ok(new_game) => {
-                let mut lock = shared_model.write().unwrap();
-                lock.player_info = new_game.players_info;
-                lock.lobby_info.data = new_game.data
-            }
-            Err(err) => {
-                let _ = toast::send(&event_tx, ToastMessage::error(err));
-            }
-        },
-        "EndGame" => match parse_payload_str::<PlayerInfoSnapshot>(&words) {
-            Ok(player_info) => {
-                let mut lock = shared_model.write().unwrap();
-                lock.player_info = player_info;
-            }
-            Err(err) => {
-                let _ = toast::send(&event_tx, ToastMessage::error(err));
-            }
-        },
-        "Error" => {}
-        "UserId" => {}
-        "PlayersInfo" => match parse_payload_str::<PlayerInfoSnapshot>(&words) {
-            Ok(player_info) => {
-                let mut lock = shared_model.write().unwrap();
-                lock.player_info = player_info;
-            }
-            Err(err) => {
-                let _ = toast::send(&event_tx, ToastMessage::error(err));
-            }
-        },
+        "LobbyInfo" => {
+            let lobby_info = parse_payload_json::<LobbyInfo>(&words)?;
+            let mut lock = shared_model.write().unwrap();
+            lock.lobby_info = lobby_info;
+        }
+        "NewGame" => {
+            let new_game = parse_payload_json::<NewGame>(&words)?;
+            let mut lock = shared_model.write().unwrap();
+            lock.lobby_info.data = new_game.data;
+            lock.player_info = new_game.players_info
+        }
+        "EndGame" => {
+            let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
+            let mut lock = shared_model.write().unwrap();
+            lock.player_info = player_info;
+        }
+        "Error" => {
+            let msg = get_payload_from_words(&words)?;
+            return Err(msg);
+        }
+        "UserId" => {
+            let user_id = get_payload_from_words(&words)?;
+            let mut lock = shared_model.write().unwrap();
+            lock.user_id = user_id;
+        }
+        "PlayersInfo" => {
+            let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
+            let mut lock = shared_model.write().unwrap();
+            lock.player_info = player_info;
+        }
         "Countdown" => {}
         _ => {}
-    }
+    };
+
+    Ok(())
 }
 
-fn parse_payload_str<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, String> {
+/// Returns the string after the cmd.
+/// Returns an error if there is nothing after the first command
+/// Assumes the shape of the words is <cmd> <...payload>, meaning everything after cmd is joined
+/// into a singular string
+fn get_payload_from_words(words: &[&str]) -> Result<String, String> {
     if words.len() < 2 {
         return Err("msg did not contain a payload".to_string());
     }
 
     let payload_str = words[1..].join(" ");
-    serde_json::from_str::<T>(&payload_str).map_err(|err| err.to_string())
+
+    Ok(payload_str)
+}
+
+/// Deserializes the payload into the given type
+fn parse_payload_json<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, String> {
+    let payload = get_payload_from_words(words)?;
+
+    serde_json::from_str::<T>(&payload).map_err(|err| err.to_string())
 }
