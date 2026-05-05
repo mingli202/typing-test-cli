@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::singleplayer::Mode;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct Data {
     pub text: String,
     pub source: String,
