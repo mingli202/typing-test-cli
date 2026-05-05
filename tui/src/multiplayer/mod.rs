@@ -211,4 +211,54 @@ mod test {
 
         assert_eq!(res.is_err(), true)
     }
+
+    #[test]
+    fn test_parse_ws_msg_lobby_info() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel {
+            user_id: None,
+            player_info: None,
+            lobby_info: None,
+        }));
+
+        let json_str = json!({
+            "lobby_id": "some-id",
+            "data": {
+                "source": "test source",
+                "text": "test text"
+            }
+        })
+        .to_string();
+
+        let msg = "LobbyInfo ".to_string() + &json_str;
+
+        assert_eq!(parse_ws_msg(&msg, Arc::clone(&shared_model)), Ok(()));
+        assert_eq!(
+            shared_model.read().unwrap().lobby_info,
+            Some(LobbyInfo {
+                lobby_id: "some-id".to_string(),
+                data: Data {
+                    text: "test text".to_string(),
+                    source: "test source".to_string()
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn test_parse_ws_msg_user_id() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel {
+            user_id: None,
+            player_info: None,
+            lobby_info: None,
+        }));
+
+        assert_eq!(
+            parse_ws_msg("UserId test-user-id", Arc::clone(&shared_model)),
+            Ok(())
+        );
+        assert_eq!(
+            shared_model.read().unwrap().user_id,
+            Some("test-user-id".to_string())
+        )
+    }
 }
