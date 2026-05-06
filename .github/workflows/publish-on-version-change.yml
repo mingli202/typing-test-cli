@@ -79,6 +79,9 @@ jobs:
       - name: Cache cargo artifacts
         if: steps.version.outputs.changed == 'true'
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tui -> target
 
       - name: Publish crate
         if: steps.version.outputs.changed == 'true'
