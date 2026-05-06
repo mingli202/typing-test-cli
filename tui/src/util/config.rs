@@ -26,17 +26,21 @@ pub struct ConfigData {
 
 impl Config {
     pub async fn new(event_tx: UnboundedSender<CustomEvent>) -> Config {
+        let (config_tx, config_rx) = mpsc::unbounded_channel();
+
+        init_config_loop(config_rx, event_tx.clone());
+
         let data = match load().await {
             Ok(data) => data,
             Err(s) => {
+                let default_data = ConfigData::default();
+                let _ = config_tx.send(default_data.clone());
+
                 let _ = toast::send(&event_tx, ToastMessage::warning(s));
-                ConfigData::default()
+
+                default_data
             }
         };
-
-        let (config_tx, config_rx) = mpsc::unbounded_channel();
-
-        init_config_loop(config_rx, event_tx);
 
         Config { data, config_tx }
     }
@@ -79,8 +83,8 @@ fn init_config_loop(
 /// Try to load the config file from the default path (~/.typing-test-tui.toml)
 async fn load() -> color_eyre::Result<ConfigData, String> {
     if let Some(path) = get_config_path() {
-        let deserialized = fs::read_to_string(&path).await;
-        match deserialized {
+        let serialized = fs::read_to_string(&path).await;
+        match serialized {
             Ok(s) => match toml::from_str::<ConfigData>(&s) {
                 Ok(c) => Ok(c),
                 Err(e) => Err(format!("Could not deserialize config file. {}", e)),
