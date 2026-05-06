@@ -1,12 +1,12 @@
 use std::sync::{Arc, RwLock};
 
-use futures::{SinkExt, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use serde::Deserialize;
-use tokio::sync::mpsc::{self, UnboundedSender};
-use tokio::task::JoinHandle;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
+use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
 use crate::util::toast::{self, ToastMessage};
@@ -33,47 +33,140 @@ pub struct SharedModel {
 pub struct MultiplayerModel {
     shared_model: Arc<RwLock<SharedModel>>,
     write_tx: UnboundedSender<String>,
+
+    cancel_token: CancellationToken,
+}
+
+impl MultiplayerModel {
+    pub async fn new(event_tx: UnboundedSender<CustomEvent>) -> Self {
+        let (write_tx, write_rx) = mpsc::unbounded_channel::<String>();
+
+        let model = MultiplayerModel {
+            shared_model: Arc::new(RwLock::new(SharedModel::default())),
+            write_tx,
+            cancel_token: CancellationToken::new(),
+        };
+
+        connect_to_ws(&model, event_tx, write_rx).await;
+
+        model
+    }
+
+    // Sends the given message to the websocket
+    pub fn send_msg(&self, msg: String) {
+        let _ = self.write_tx.send(msg);
+    }
+}
+
+impl Drop for MultiplayerModel {
+    fn drop(&mut self) {
+        self.cancel_token.cancel();
+    }
 }
 
 // Connects to the ws
-pub async fn connect_to_ws(model: &mut MultiplayerModel, event_tx: UnboundedSender<CustomEvent>) {
+pub async fn connect_to_ws(
+    model: &MultiplayerModel,
+    event_tx: UnboundedSender<CustomEvent>,
+    write_rx: UnboundedReceiver<String>,
+) {
     let request = "ws://localhost:8080/ws".into_client_request().unwrap();
 
     let (stream, _) = connect_async(request).await.unwrap();
-    let (mut write, mut read) = stream.split();
+    let (write, read) = stream.split();
 
-    let (write_tx, mut write_rx) = mpsc::unbounded_channel::<String>();
+    let (read_tx, read_rx) = mpsc::unbounded_channel::<String>();
 
     let shared_model = Arc::clone(&model.shared_model);
 
-    let read_handle: JoinHandle<color_eyre::Result<()>> = tokio::spawn(async move {
-        while let Some(msg) = read.next().await {
-            let msg = msg?;
+    init_write_task(write, write_rx, model.cancel_token.clone());
+    init_read_task(read, read_tx, model.cancel_token.clone());
+    init_recv_msg_task(shared_model, read_rx, event_tx, model.cancel_token.clone());
+}
 
-            if !msg.is_text() {
-                return Ok(());
-            }
-
-            let text = msg.to_text()?;
-
-            if let Err(err) = parse_ws_msg(text, Arc::clone(&shared_model)) {
-                let _ = toast::send(&event_tx, ToastMessage::error(err));
+// inits the task that will listen for messages to be sent to the websocket
+fn init_write_task<T: SinkExt<Message> + Unpin + Send + 'static>(
+    mut write: T,
+    mut write_rx: UnboundedReceiver<String>,
+    cancel_token: CancellationToken,
+) {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                Some(msg) = write_rx.recv() => {
+                    let send_msg = Message::Text(Utf8Bytes::from(msg));
+                    let _ = write.send(send_msg).await;
+                }
+                _ = cancel_token.cancelled() => {
+                    return;
+                }
             }
         }
-
-        Ok(())
     });
+}
 
-    let write_handle: JoinHandle<color_eyre::Result<()>> = tokio::spawn(async move {
-        while let Some(msg) = write_rx.recv().await {
-            let send_msg = Message::Text(Utf8Bytes::from(msg));
-            write.send(send_msg).await?;
+// inits the task that will listen for messages received from the websocket
+fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'static>(
+    mut read: T,
+    read_tx: UnboundedSender<String>,
+    cancel_token: CancellationToken,
+) where
+    E: std::error::Error,
+{
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                Some(msg) = read.next() => {
+                    let msg = match msg {
+                        Ok(m) => m,
+                        Err(_) => {
+                            return;
+                        }
+                    };
+
+                    if !msg.is_text() {
+                        return;
+                    }
+
+                    let text = match msg.to_text() {
+                        Ok(t) => t,
+                        Err(_) => {
+                            return;
+                        }
+                    };
+
+                    let _ = read_tx.send(text.to_string());
+                }
+                _ = cancel_token.cancelled() => {
+                    return
+                }
+            }
         }
-
-        Ok(())
     });
+}
 
-    model.write_tx = write_tx;
+// inits the task that will listen for messages send through the given read channel
+// its to have a dedicated task for handling shared_model state change
+fn init_recv_msg_task(
+    shared_model: Arc<RwLock<SharedModel>>,
+    mut read_rx: UnboundedReceiver<String>,
+    event_tx: UnboundedSender<CustomEvent>,
+    cancel_token: CancellationToken,
+) {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                Some(msg) = read_rx.recv() => {
+                    if let Err(err) = parse_ws_msg(&msg, Arc::clone(&shared_model)) {
+                        let _ = toast::send(&event_tx, ToastMessage::error(err));
+                    }
+                }
+                _ = cancel_token.cancelled() => {
+                        return;
+                }
+            }
+        }
+    });
 }
 
 // parses the msg into the commands and execute them
