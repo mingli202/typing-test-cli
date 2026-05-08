@@ -135,7 +135,7 @@ fn init_recv_msg_task(
 fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(), String> {
     let words: Vec<&str> = msg.split(" ").collect();
 
-    if words.is_empty() {
+    if words.is_empty() || words[0].is_empty() {
         return Err("msg did not contain a cmd".to_string());
     }
 
@@ -183,7 +183,7 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             let mut lock = shared_model.write().unwrap();
             lock.game_status = Some(GameStatus::Countdown(countdown));
         }
-        _ => {}
+        _ => return Err(format!("cmd {} unsupported", cmd)),
     };
 
     Ok(())
