@@ -36,5 +36,5 @@ all the possible responses:
 - UserId (UserId: string)
 - LeaveGroup (DidSucceed: bool)
 - PlayersInfo (PlayerInfoSnapshot)
-- Countdown (Coundown: int)
+- Countdown (Countdown: int)
 ```
