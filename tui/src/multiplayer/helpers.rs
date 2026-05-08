@@ -389,7 +389,6 @@ mod test {
             self: std::pin::Pin<&mut Self>,
             _cx: &mut std::task::Context<'_>,
         ) -> Poll<Result<(), Self::Error>> {
-            self.get_mut().messages.clear();
             Poll::Ready(Ok(()))
         }
         fn poll_close(
