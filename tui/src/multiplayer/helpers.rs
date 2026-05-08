@@ -87,7 +87,7 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
                     };
 
                     if !msg.is_text() {
-                        return;
+                        continue;
                     }
 
                     let text = match msg.to_text() {
