@@ -404,7 +404,7 @@ mod test {
             _cx: &mut std::task::Context<'_>,
         ) -> std::task::Poll<Option<Self::Item>> {
             let msg = self.get_mut().messages.pop_front();
-            Poll::Ready(msg.map(|m| Ok(m)))
+            Poll::Ready(msg.map(Ok))
         }
     }
 
@@ -471,6 +471,7 @@ mod test {
             read.next().await,
             Some(Ok(Message::Text(Utf8Bytes::from("LeaveGroup"))))
         );
+        assert_eq!(read.next().await, None);
 
         // Cleanup
         model.cancel_token.cancel();
@@ -484,17 +485,19 @@ mod test {
             "JoinGroup asdfgh".to_string(),
             "LeaveGroup".to_string(),
         ]);
-        let (mut write, read) = s.split();
+        let (_, read) = s.split();
 
-        let (read_tx, read_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (read_tx, mut read_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
         let cancel_token = CancellationToken::new();
 
         // Act
         init_read_task(read, read_tx, cancel_token.clone());
-        let _ = write.send(Message::Text(Utf8Bytes::from("adsf"))).await;
 
         // Assert
+        assert_eq!(read_rx.recv().await, Some("NewGroup".to_string()));
+        assert_eq!(read_rx.recv().await, Some("JoinGroup asdfgh".to_string()));
+        assert_eq!(read_rx.recv().await, Some("LeaveGroup".to_string()));
 
         // Cleanup
         cancel_token.cancel();
