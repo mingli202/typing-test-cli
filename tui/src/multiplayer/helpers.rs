@@ -21,9 +21,22 @@ pub async fn connect_to_ws(
     event_tx: UnboundedSender<CustomEvent>,
     write_rx: UnboundedReceiver<String>,
 ) {
-    let request = "ws://localhost:8080/ws".into_client_request().unwrap();
+    let request = match "ws://localhost:8080/ws".into_client_request() {
+        Ok(res) => res,
+        Err(e) => {
+            let _ = toast::send(&event_tx, ToastMessage::error(e.to_string()));
+            return;
+        }
+    };
 
-    let (stream, _) = connect_async(request).await.unwrap();
+    let (stream, _) = match connect_async(request).await {
+        Ok(ok) => ok,
+        Err(e) => {
+            let _ = toast::send(&event_tx, ToastMessage::error(e.to_string()));
+            return;
+        }
+    };
+
     let (write, read) = stream.split();
 
     let (read_tx, read_rx) = mpsc::unbounded_channel::<String>();
