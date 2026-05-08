@@ -1,18 +1,12 @@
 use std::sync::{Arc, RwLock};
 
-use futures::{SinkExt, Stream, StreamExt};
-use serde::Deserialize;
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
+use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
-use crate::util::toast::{self, ToastMessage};
 
 use self::helpers::connect_to_ws;
-use self::models::{LobbyInfo, NewGame, PlayerInfoSnapshot, WsMsg};
+use self::models::{LobbyInfo, PlayerInfoSnapshot, WsMsg};
 
 mod helpers;
 mod models;
