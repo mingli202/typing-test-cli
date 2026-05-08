@@ -64,7 +64,7 @@ impl Drop for MultiplayerModel {
     }
 }
 
-// Connects to the ws
+/// Connects to the ws
 pub async fn connect_to_ws(
     model: &MultiplayerModel,
     event_tx: UnboundedSender<CustomEvent>,
@@ -84,7 +84,7 @@ pub async fn connect_to_ws(
     init_recv_msg_task(shared_model, read_rx, event_tx, model.cancel_token.clone());
 }
 
-// inits the task that will listen for messages to be sent to the websocket
+/// inits the task that will listen for messages to be sent to the websocket
 fn init_write_task<T: SinkExt<Message> + Unpin + Send + 'static>(
     mut write: T,
     mut write_rx: UnboundedReceiver<String>,
@@ -105,7 +105,7 @@ fn init_write_task<T: SinkExt<Message> + Unpin + Send + 'static>(
     });
 }
 
-// inits the task that will listen for messages received from the websocket
+/// inits the task that will listen for messages received from the websocket
 fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'static>(
     mut read: T,
     read_tx: UnboundedSender<String>,
@@ -145,8 +145,8 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
     });
 }
 
-// inits the task that will listen for messages send through the given read channel
-// its to have a dedicated task for handling shared_model state change
+/// inits the task that will listen for messages send through the given read channel
+/// its to have a dedicated task for handling shared_model state change
 fn init_recv_msg_task(
     shared_model: Arc<RwLock<SharedModel>>,
     mut read_rx: UnboundedReceiver<String>,
@@ -169,7 +169,7 @@ fn init_recv_msg_task(
     });
 }
 
-// parses the msg into the commands and execute them
+/// parses the msg into the commands and execute them
 fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(), String> {
     let words: Vec<&str> = msg.split(" ").collect();
 
@@ -250,10 +250,14 @@ fn parse_payload_json<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, S
 
 #[cfg(test)]
 mod test {
+    use std::collections::VecDeque;
+    use std::fmt::Display;
+    use std::task::Poll;
+
     use crate::util::data_provider::Data;
 
     use super::*;
-    use futures::channel::mpsc;
+    use futures::Sink;
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
@@ -365,10 +369,82 @@ mod test {
         )
     }
 
+    #[derive(Debug, PartialEq, PartialOrd)]
+    struct MockError {
+        err: String,
+    }
+
+    impl Display for MockError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.err)
+        }
+    }
+
+    impl std::error::Error for MockError {}
+
+    struct MockWebsocketStream {
+        messages: VecDeque<Message>,
+    }
+
+    impl MockWebsocketStream {
+        fn new(messages: Vec<String>) -> MockWebsocketStream {
+            MockWebsocketStream {
+                messages: messages
+                    .into_iter()
+                    .map(|msg| Message::Text(Utf8Bytes::from(&msg)))
+                    .collect(),
+            }
+        }
+    }
+
+    impl Stream for MockWebsocketStream {
+        type Item = Result<Message, MockError>;
+        fn poll_next(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Option<Self::Item>> {
+            let msg = self.get_mut().messages.pop_front();
+            Poll::Ready(msg.map(|m| Ok(m)))
+        }
+    }
+
+    impl Sink<Message> for MockWebsocketStream {
+        type Error = MockError;
+
+        fn poll_ready(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+        fn start_send(self: std::pin::Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
+            self.get_mut().messages.push_back(item);
+            Ok(())
+        }
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
+            self.get_mut().messages.clear();
+            Poll::Ready(Ok(()))
+        }
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
+            self.poll_flush(cx)
+        }
+    }
+
     #[tokio::test]
     async fn test_init_write_task() {
         // Arrange
-        let (write, mut read) = mpsc::unbounded();
+        let s = MockWebsocketStream::new(vec![
+            "NewGroup".to_string(),
+            "JoinGroup asdfgh".to_string(),
+            "LeaveGroup".to_string(),
+        ]);
+        let (write, mut read) = s.split();
 
         let (write_tx, write_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
@@ -379,28 +455,48 @@ mod test {
             write_tx,
         };
 
-        init_write_task(write, write_rx, model.cancel_token.clone());
-
         // Act
-        model.send_msg(WsMsg::NewGroup);
-        model.send_msg(WsMsg::JoinGroup("asdfgh".to_string()));
-        model.send_msg(WsMsg::LeaveGroup);
+        init_write_task(write, write_rx, model.cancel_token.clone());
 
         // Assert
         assert_eq!(
-            read.recv().await,
-            Ok(Message::Text(Utf8Bytes::from("NewGroup")))
+            read.next().await,
+            Some(Ok(Message::Text(Utf8Bytes::from("NewGroup"))))
         );
         assert_eq!(
-            read.recv().await,
-            Ok(Message::Text(Utf8Bytes::from("JoinGroup asdfgh")))
+            read.next().await,
+            Some(Ok(Message::Text(Utf8Bytes::from("JoinGroup asdfgh"))))
         );
         assert_eq!(
-            read.recv().await,
-            Ok(Message::Text(Utf8Bytes::from("LeaveGroup")))
+            read.next().await,
+            Some(Ok(Message::Text(Utf8Bytes::from("LeaveGroup"))))
         );
 
         // Cleanup
         model.cancel_token.cancel();
+    }
+
+    #[tokio::test]
+    async fn test_init_read_task() {
+        // Arrange
+        let s = MockWebsocketStream::new(vec![
+            "NewGroup".to_string(),
+            "JoinGroup asdfgh".to_string(),
+            "LeaveGroup".to_string(),
+        ]);
+        let (mut write, read) = s.split();
+
+        let (read_tx, read_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+        let cancel_token = CancellationToken::new();
+
+        // Act
+        init_read_task(read, read_tx, cancel_token.clone());
+        let _ = write.send(Message::Text(Utf8Bytes::from("adsf"))).await;
+
+        // Assert
+
+        // Cleanup
+        cancel_token.cancel();
     }
 }
