@@ -1,9 +1,12 @@
 use std::sync::{Arc, RwLock};
 
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
+use crate::msg::Msg;
 
 use self::helpers::connect_to_ws;
 use self::models::{LobbyInfo, PlayerInfoSnapshot, WsMsg};
@@ -64,3 +67,13 @@ impl Drop for MultiplayerModel {
         self.cancel_token.cancel();
     }
 }
+
+pub fn update(model: &mut MultiplayerModel, msg: Msg) {
+    match msg {
+        Msg::Key(key) => {}
+        Msg::Tick => {}
+        _ => {}
+    }
+}
+
+pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {}
