@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use crate::CustomEvent;
 use crate::util::toast::{self, ToastMessage};
 
-use self::models::{LobbyInfo, NewGame, PlayerInfoSnapshot};
+use self::models::{LobbyInfo, NewGame, PlayerInfoSnapshot, WsMsg};
 
 mod models;
 
@@ -53,8 +53,8 @@ impl MultiplayerModel {
     }
 
     // Sends the given message to the websocket
-    pub fn send_msg(&self, msg: String) {
-        let _ = self.write_tx.send(msg);
+    pub fn send_msg(&self, msg: WsMsg) {
+        let _ = self.write_tx.send(msg.to_string());
     }
 }
 
@@ -253,6 +253,7 @@ mod test {
     use crate::util::data_provider::Data;
 
     use super::*;
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
@@ -362,5 +363,44 @@ mod test {
             shared_model.read().unwrap().user_id,
             Some("test-user-id".to_string())
         )
+    }
+
+    #[tokio::test]
+    async fn test_init_write_task() {
+        // Arrange
+        let (write, mut read) = mpsc::unbounded();
+
+        let (write_tx, write_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        let model = MultiplayerModel {
+            cancel_token: CancellationToken::new(),
+            shared_model,
+            write_tx,
+        };
+
+        init_write_task(write, write_rx, model.cancel_token.clone());
+
+        // Act
+        model.send_msg(WsMsg::NewGroup);
+        model.send_msg(WsMsg::JoinGroup("asdfgh".to_string()));
+        model.send_msg(WsMsg::LeaveGroup);
+
+        // Assert
+        assert_eq!(
+            read.recv().await,
+            Ok(Message::Text(Utf8Bytes::from("NewGroup")))
+        );
+        assert_eq!(
+            read.recv().await,
+            Ok(Message::Text(Utf8Bytes::from("JoinGroup asdfgh")))
+        );
+        assert_eq!(
+            read.recv().await,
+            Ok(Message::Text(Utf8Bytes::from("LeaveGroup")))
+        );
+
+        // Cleanup
+        model.cancel_token.cancel();
     }
 }
