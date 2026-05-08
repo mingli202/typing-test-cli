@@ -253,6 +253,7 @@ mod test {
     use std::collections::VecDeque;
     use std::fmt::Display;
     use std::task::Poll;
+    use std::time::Duration;
 
     use crate::util::data_provider::Data;
 
@@ -501,5 +502,50 @@ mod test {
 
         // Cleanup
         cancel_token.cancel();
+    }
+
+    #[tokio::test]
+    async fn test_init_recv_msg_task() {
+        // Arrange
+        let (read_tx, read_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (write_tx, _) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (event_tx, _) = tokio::sync::mpsc::unbounded_channel::<CustomEvent>();
+
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        let model = MultiplayerModel {
+            cancel_token: CancellationToken::new(),
+            shared_model: Arc::clone(&shared_model),
+            write_tx,
+        };
+
+        let lobby_info = LobbyInfo {
+            lobby_id: "asdfgh".to_string(),
+            data: Data {
+                text: "text".to_string(),
+                source: "source".to_string(),
+            },
+        };
+
+        // Act
+        init_recv_msg_task(
+            Arc::clone(&model.shared_model),
+            read_rx,
+            event_tx,
+            model.cancel_token.clone(),
+        );
+
+        let msg1 = "LobbyInfo ".to_string() + &serde_json::to_string(&lobby_info).unwrap();
+
+        let _ = read_tx.send(msg1);
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Assert
+        {
+            let lock = shared_model.read().unwrap();
+            assert_eq!(lock.lobby_info, Some(lobby_info));
+        }
+
+        // Cleanup
+        model.cancel_token.cancel();
     }
 }
