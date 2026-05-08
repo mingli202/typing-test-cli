@@ -38,7 +38,7 @@ pub struct MultiplayerModel {
 }
 
 impl MultiplayerModel {
-    pub async fn new(event_tx: UnboundedSender<CustomEvent>) -> Self {
+    pub fn new(event_tx: UnboundedSender<CustomEvent>) -> Self {
         let (write_tx, write_rx) = mpsc::unbounded_channel::<String>();
 
         let model = MultiplayerModel {
@@ -47,7 +47,12 @@ impl MultiplayerModel {
             cancel_token: CancellationToken::new(),
         };
 
-        connect_to_ws(&model, event_tx, write_rx).await;
+        tokio::spawn(connect_to_ws(
+            Arc::clone(&model.shared_model),
+            model.cancel_token.clone(),
+            event_tx,
+            write_rx,
+        ));
 
         model
     }
@@ -66,7 +71,8 @@ impl Drop for MultiplayerModel {
 
 /// Connects to the ws
 pub async fn connect_to_ws(
-    model: &MultiplayerModel,
+    shared_model: Arc<RwLock<SharedModel>>,
+    cancel_token: CancellationToken,
     event_tx: UnboundedSender<CustomEvent>,
     write_rx: UnboundedReceiver<String>,
 ) {
@@ -77,11 +83,9 @@ pub async fn connect_to_ws(
 
     let (read_tx, read_rx) = mpsc::unbounded_channel::<String>();
 
-    let shared_model = Arc::clone(&model.shared_model);
-
-    init_write_task(write, write_rx, model.cancel_token.clone());
-    init_read_task(read, read_tx, model.cancel_token.clone());
-    init_recv_msg_task(shared_model, read_rx, event_tx, model.cancel_token.clone());
+    init_write_task(write, write_rx, cancel_token.clone());
+    init_read_task(read, read_tx, cancel_token.clone());
+    init_recv_msg_task(shared_model, read_rx, event_tx, cancel_token.clone());
 }
 
 /// inits the task that will listen for messages to be sent to the websocket
