@@ -174,6 +174,13 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             let mut lock = shared_model.write().unwrap();
             lock.user_id = Some(user_id);
         }
+        "LeaveGroup" => {
+            let did_succeed = parse_payload_json::<bool>(&words)?;
+
+            if !did_succeed {
+                return Err("Something went wrong leaving the group".to_string());
+            }
+        }
         "PlayersInfo" => {
             let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
             let mut lock = shared_model.write().unwrap();
