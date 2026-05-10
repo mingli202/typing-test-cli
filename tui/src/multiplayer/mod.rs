@@ -21,7 +21,7 @@ pub enum GameStatus {
 #[derive(Default)]
 pub struct SharedModel {
     user_id: Option<String>,
-    player_info: Option<PlayerInfoSnapshot>,
+    players_info: Option<PlayerInfoSnapshot>,
     lobby_info: Option<LobbyInfo>,
     game_status: Option<GameStatus>,
 }
@@ -53,7 +53,7 @@ impl MultiplayerModel {
         model
     }
 
-    // Sends the given message to the websocket
+    /// Sends the given message to the websocket
     pub fn send_msg(&self, msg: WsMsg) {
         let _ = self.write_tx.send(msg.to_string());
     }
