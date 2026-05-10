@@ -208,7 +208,7 @@ fn view_stats(
 /// Render some instructions
 fn view_bottom_menu_typing(area: Rect, buf: &mut Buffer) {
     let text = text![
-        line!("Next <Tab>  Quit <Esc>"),
+        line!("Next <Tab>  Quit <Esc>  PVP <C-p>"),
         line!("Select mode <Up/Down/Left/Right>"),
     ]
     .fg(Color::DarkGray)

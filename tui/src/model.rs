@@ -67,7 +67,7 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
                     return Some(Action::Quit);
                 }
                 Msg::Key(KeyEvent {
-                    code: KeyCode::Char('g'),
+                    code: KeyCode::Char('p'),
                     modifiers: KeyModifiers::CONTROL,
                     ..
                 }) => {
