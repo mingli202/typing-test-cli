@@ -7,6 +7,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
 use crate::msg::Msg;
+use crate::util::view_helpers;
 
 use self::helpers::connect_to_ws;
 use self::models::{LobbyInfo, PlayersInfoSnapshot, WsMsg};
@@ -22,7 +23,7 @@ pub enum GameStatus {
 }
 
 #[derive(Default)]
-pub struct SharedModel {
+pub struct GameModel {
     user_id: Option<String>,
     active_lobby_id: Option<String>,
     pending_join_lobby_id: Option<String>,
@@ -32,7 +33,7 @@ pub struct SharedModel {
 }
 
 pub struct MultiplayerModel {
-    shared_model: Arc<RwLock<SharedModel>>,
+    game_model: Arc<RwLock<GameModel>>,
     write_tx: UnboundedSender<String>,
 
     cancel_token: CancellationToken,
@@ -43,13 +44,13 @@ impl MultiplayerModel {
         let (write_tx, write_rx) = mpsc::unbounded_channel::<String>();
 
         let model = MultiplayerModel {
-            shared_model: Arc::new(RwLock::new(SharedModel::default())),
+            game_model: Arc::new(RwLock::new(GameModel::default())),
             write_tx,
             cancel_token: CancellationToken::new(),
         };
 
         tokio::spawn(connect_to_ws(
-            Arc::clone(&model.shared_model),
+            Arc::clone(&model.game_model),
             model.cancel_token.clone(),
             event_tx,
             write_rx,
@@ -67,7 +68,7 @@ impl MultiplayerModel {
         let did_send = self.write_tx.send(msg.to_string()).is_ok();
 
         if did_send && let Some(group_id) = pending_join_lobby_id {
-            let mut lock = self.shared_model.write().unwrap();
+            let mut lock = self.game_model.write().unwrap();
             lock.pending_join_lobby_id = Some(group_id);
         }
     }
@@ -89,4 +90,13 @@ pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::A
     None
 }
 
-pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {}
+pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
+    let lock = model.game_model.read().unwrap();
+
+    match &lock.lobby_info {
+        None => {}
+        Some(lobby_info) => {}
+    };
+
+    view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Quit <Esc>"], area, buf);
+}
