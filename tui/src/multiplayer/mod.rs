@@ -21,6 +21,8 @@ pub enum GameStatus {
 #[derive(Default)]
 pub struct SharedModel {
     user_id: Option<String>,
+    active_lobby_id: Option<String>,
+    pending_join_lobby_id: Option<String>,
     players_info: Option<PlayersInfoSnapshot>,
     lobby_info: Option<LobbyInfo>,
     game_status: Option<GameStatus>,
@@ -55,6 +57,11 @@ impl MultiplayerModel {
 
     /// Sends the given message to the websocket
     pub fn send_msg(&self, msg: WsMsg) {
+        if let WsMsg::JoinGroup(group_id) = &msg {
+            let mut lock = self.shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some(group_id.clone());
+        }
+
         let _ = self.write_tx.send(msg.to_string());
     }
 }

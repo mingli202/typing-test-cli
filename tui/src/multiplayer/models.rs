@@ -14,6 +14,7 @@ pub struct PlayerInfo {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PlayersInfoSnapshot {
+    pub lobby_id: String,
     pub version: u64,
     pub players: HashMap<String, PlayerInfo>,
 }

@@ -154,8 +154,13 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
         "LobbyInfo" => {
             let lobby_info = parse_payload_json::<LobbyInfo>(&words)?;
             let mut lock = shared_model.write().unwrap();
+            let lobby_id = lobby_info.lobby_id.clone();
 
             lock.lobby_info = Some(lobby_info);
+            lock.active_lobby_id = Some(lobby_id.clone());
+            if lock.pending_join_lobby_id.as_deref() == Some(lobby_id.as_str()) {
+                lock.pending_join_lobby_id = None;
+            }
             lock.game_status = Some(GameStatus::Waiting);
         }
         "NewGame" => {
@@ -235,6 +240,8 @@ fn parse_payload_json<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, S
 fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
     let mut lock = shared_model.write().unwrap();
 
+    lock.active_lobby_id = None;
+    lock.pending_join_lobby_id = None;
     lock.players_info = None;
     lock.lobby_info = None;
     lock.game_status = None;
@@ -245,6 +252,14 @@ fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
 /// backend will not allow the user to join another group if the user is already in a group.
 fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayersInfoSnapshot) {
     let mut lock = shared_model.write().unwrap();
+    let expected_lobby_id = lock
+        .active_lobby_id
+        .as_deref()
+        .or(lock.pending_join_lobby_id.as_deref());
+
+    if expected_lobby_id != Some(incoming_players.lobby_id.as_str()) {
+        return;
+    }
 
     match &mut lock.players_info {
         Some(players) => {
@@ -392,7 +407,7 @@ mod test {
                 source: "source".to_string(),
             },
         };
-        let players_info = players_info_snapshot(1, &["user-1"]);
+        let players_info = players_info_snapshot("lobby-1", 1, &["user-1"]);
 
         assert_eq!(
             parse_ws_msg("UserId user-1", Arc::clone(&shared_model)),
@@ -435,9 +450,13 @@ mod test {
     #[test]
     fn test_parse_ws_msg_players_info_ignores_stale_snapshot_for_same_lobby() {
         let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("lobby-1".to_string());
+        }
 
-        let fresh_players = players_info_snapshot(2, &["new-player"]);
-        let stale_players = players_info_snapshot(1, &["old-player"]);
+        let fresh_players = players_info_snapshot("lobby-1", 2, &["new-player"]);
+        let stale_players = players_info_snapshot("lobby-1", 1, &["old-player"]);
 
         assert_eq!(
             parse_ws_msg(
@@ -464,7 +483,89 @@ mod test {
         assert_eq!(lock.players_info, Some(fresh_players));
     }
 
-    fn players_info_snapshot(version: u64, player_ids: &[&str]) -> PlayersInfoSnapshot {
+    #[test]
+    fn test_parse_ws_msg_players_info_is_accepted_before_lobby_info_if_join_is_pending() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("target-lobby".to_string());
+        }
+
+        let players_info = players_info_snapshot("target-lobby", 1, &["user-1"]);
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&players_info).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.players_info, Some(players_info));
+        assert_eq!(lock.pending_join_lobby_id, Some("target-lobby".to_string()));
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_is_rejected_for_wrong_lobby_when_join_is_pending() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("target-lobby".to_string());
+        }
+
+        let wrong_lobby_players = players_info_snapshot("other-lobby", 99, &["user-1"]);
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&wrong_lobby_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.players_info, None);
+    }
+
+    #[test]
+    fn test_parse_ws_msg_lobby_info_sets_active_lobby_and_clears_matching_pending_join() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("lobby-2".to_string());
+        }
+
+        let lobby_info = LobbyInfo {
+            lobby_id: "lobby-2".to_string(),
+            data: Data {
+                text: "text".to_string(),
+                source: "source".to_string(),
+            },
+        };
+
+        assert_eq!(
+            parse_ws_msg(
+                &format!("LobbyInfo {}", serde_json::to_string(&lobby_info).unwrap()),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.active_lobby_id, Some("lobby-2".to_string()));
+        assert_eq!(lock.pending_join_lobby_id, None);
+    }
+
+    fn players_info_snapshot(
+        lobby_id: &str,
+        version: u64,
+        player_ids: &[&str],
+    ) -> PlayersInfoSnapshot {
         let players = player_ids
             .iter()
             .map(|id| {
@@ -479,7 +580,11 @@ mod test {
             })
             .collect::<HashMap<_, _>>();
 
-        PlayersInfoSnapshot { version, players }
+        PlayersInfoSnapshot {
+            lobby_id: lobby_id.to_string(),
+            version,
+            players,
+        }
     }
 
     #[derive(Debug, PartialEq, PartialOrd)]
