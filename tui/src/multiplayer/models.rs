@@ -13,7 +13,7 @@ pub struct PlayerInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct PlayerInfoSnapshot {
+pub struct PlayersInfoSnapshot {
     pub version: u64,
     pub players: HashMap<String, PlayerInfo>,
 }
@@ -27,7 +27,7 @@ pub struct LobbyInfo {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct NewGame {
     pub data: Data,
-    pub players_info: PlayerInfoSnapshot,
+    pub players_info: PlayersInfoSnapshot,
 }
 
 #[derive(Debug)]

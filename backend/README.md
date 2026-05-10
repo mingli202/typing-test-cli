@@ -29,7 +29,7 @@ some type definition:
 ```
 Data = { text: string, source: string }
 PlayerInfo = { is_leader: bool, wpm: float64, progress_percent: uint8 }
-PlayerInfoSnapshot = {
+PlayersInfoSnapshot = {
   version: uint64,
   players: { [userId: string]: PlayerInfo }
 }
@@ -38,12 +38,12 @@ PlayerInfoSnapshot = {
 all the possible responses:
 ```
 - LobbyInfo (LobbyInfo)
-- NewGame (NewGame: { data: Data, player_info: PlayerInfoSnapshot })
-- EndGame (FinalPlayersInfo: PlayerInfoSnapshot)
+- NewGame (NewGame: { data: Data, players_info: PlayersInfoSnapshot })
+- EndGame (FinalPlayersInfo: PlayersInfoSnapshot)
 - Error (Msg: string)
 - UserId (UserId: string)
 - LeaveGroup (DidSucceed: bool)
-- PlayersInfo (PlayerInfoSnapshot)
+- PlayersInfo (PlayersInfoSnapshot)
 - Countdown (Countdown: int)
 - StartGame
 ```

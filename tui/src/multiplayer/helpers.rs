@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use crate::CustomEvent;
 use crate::util::toast::{self, ToastMessage};
 
-use super::models::{LobbyInfo, NewGame, PlayerInfoSnapshot};
+use super::models::{LobbyInfo, NewGame, PlayersInfoSnapshot};
 use super::{GameStatus, SharedModel};
 
 /// Connects to the ws
@@ -167,7 +167,7 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             lock.players_info = Some(new_game.players_info)
         }
         "EndGame" => {
-            let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
+            let player_info = parse_payload_json::<PlayersInfoSnapshot>(&words)?;
             let mut lock = shared_model.write().unwrap();
             lock.players_info = Some(player_info);
             lock.game_status = Some(GameStatus::End);
@@ -191,7 +191,7 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             clear_shared_model(shared_model);
         }
         "PlayersInfo" => {
-            let incoming_players = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
+            let incoming_players = parse_payload_json::<PlayersInfoSnapshot>(&words)?;
             update_players(shared_model, incoming_players);
         }
         "Countdown" => {
@@ -243,7 +243,7 @@ fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
 /// updates the players if it's new
 /// the incoming_playings will always be specific to the current group the user is in because the
 /// backend will not allow the user to join another group if the user is already in a group.
-fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayerInfoSnapshot) {
+fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayersInfoSnapshot) {
     let mut lock = shared_model.write().unwrap();
 
     match &mut lock.players_info {
@@ -502,7 +502,7 @@ mod test {
         assert_eq!(lock.players_info, Some(new_lobby_players));
     }
 
-    fn players_info_snapshot(version: u64, player_ids: &[&str]) -> PlayerInfoSnapshot {
+    fn players_info_snapshot(version: u64, player_ids: &[&str]) -> PlayersInfoSnapshot {
         let players = player_ids
             .iter()
             .map(|id| {
@@ -517,7 +517,7 @@ mod test {
             })
             .collect::<HashMap<_, _>>();
 
-        PlayerInfoSnapshot { version, players }
+        PlayersInfoSnapshot { version, players }
     }
 
     #[derive(Debug, PartialEq, PartialOrd)]

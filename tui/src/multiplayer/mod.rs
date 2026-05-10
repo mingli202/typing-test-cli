@@ -6,7 +6,7 @@ use tokio_util::sync::CancellationToken;
 use crate::CustomEvent;
 
 use self::helpers::connect_to_ws;
-use self::models::{LobbyInfo, PlayerInfoSnapshot, WsMsg};
+use self::models::{LobbyInfo, PlayersInfoSnapshot, WsMsg};
 
 mod helpers;
 mod models;
@@ -21,7 +21,7 @@ pub enum GameStatus {
 #[derive(Default)]
 pub struct SharedModel {
     user_id: Option<String>,
-    players_info: Option<PlayerInfoSnapshot>,
+    players_info: Option<PlayersInfoSnapshot>,
     lobby_info: Option<LobbyInfo>,
     game_status: Option<GameStatus>,
 }
