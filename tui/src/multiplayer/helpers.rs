@@ -200,6 +200,10 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             let mut lock = shared_model.write().unwrap();
             lock.game_status = Some(GameStatus::Countdown(countdown));
         }
+        "StartGame" => {
+            let mut lock = shared_model.write().unwrap();
+            lock.game_status = Some(GameStatus::Playing);
+        }
         _ => return Err(format!("cmd {} unsupported", cmd)),
     };
 
@@ -237,7 +241,6 @@ fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
 }
 
 /// updates the players if it's new
-/// if the player was in countdown, they are now playing
 /// the incoming_playings will always be specific to the current group the user is in because the
 /// backend will not allow the user to join another group if the user is already in a group.
 fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayerInfoSnapshot) {
@@ -252,16 +255,6 @@ fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: Play
             }
         }
         None => lock.players_info = Some(incoming_players),
-    }
-
-    // if the player was waiting for the countdown and if the user is part of the players then they should be playing
-    if let Some(GameStatus::Countdown(countdown)) = lock.game_status
-        && countdown == 0
-        && let Some(ref user_id) = lock.user_id
-        && let Some(ref players_info) = lock.players_info
-        && players_info.players.contains_key(user_id)
-    {
-        lock.game_status = Some(GameStatus::Playing);
     }
 }
 
