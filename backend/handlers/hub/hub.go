@@ -59,14 +59,14 @@ func (hub *Hub) handleLeave(u *user.User) error {
 // If successful, notify group that a new user has joined
 // Return the lobbyInfo on succesful join
 func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, error) {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
 	oldGroupId := u.GroupId
 
 	if oldGroupId != nil {
 		return models.LobbyInfo{}, fmt.Errorf("Already in a group, leave the group before joining a new one!")
 	}
-
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
 
 	group, err := hub.canJoinGroupLocked(groupId, u)
 
