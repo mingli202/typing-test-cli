@@ -264,7 +264,7 @@ fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: Play
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
+    use std::collections::{HashMap, VecDeque};
     use std::fmt::Display;
     use std::task::Poll;
     use std::time::Duration;
@@ -383,6 +383,175 @@ mod test {
             shared_model.read().unwrap().user_id,
             Some("test-user-id".to_string())
         )
+    }
+
+    #[test]
+    fn test_parse_ws_msg_leave_group_success_clears_lobby_state() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+
+        let lobby_info = LobbyInfo {
+            lobby_id: "lobby-1".to_string(),
+            data: Data {
+                text: "text".to_string(),
+                source: "source".to_string(),
+            },
+        };
+        let players_info = players_info_snapshot("lobby-1", 1, &["user-1"]);
+
+        assert_eq!(
+            parse_ws_msg("UserId user-1", Arc::clone(&shared_model)),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!("LobbyInfo {}", serde_json::to_string(&lobby_info).unwrap()),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&players_info).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg("Countdown 3", Arc::clone(&shared_model)),
+            Ok(())
+        );
+
+        assert_eq!(
+            parse_ws_msg("LeaveGroup true", Arc::clone(&shared_model)),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.user_id, Some("user-1".to_string()));
+        assert_eq!(lock.lobby_info, None);
+        assert_eq!(lock.players_info, None);
+        assert!(lock.game_status.is_none());
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_ignores_stale_snapshot_for_same_lobby() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+
+        let fresh_players = players_info_snapshot("lobby-1", 2, &["new-player"]);
+        let stale_players = players_info_snapshot("lobby-1", 1, &["old-player"]);
+
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&fresh_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&stale_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.players_info, Some(fresh_players));
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_accepts_lower_version_for_new_lobby() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+
+        let old_lobby_players = players_info_snapshot("lobby-1", 5, &["old-lobby-player"]);
+        let new_lobby_players = players_info_snapshot("lobby-2", 1, &["new-lobby-player"]);
+
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&old_lobby_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&new_lobby_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.players_info, Some(new_lobby_players));
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_changes_countdown_to_playing_for_current_player() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        let players_info = players_info_snapshot("lobby-1", 1, &["user-1", "user-2"]);
+
+        assert_eq!(
+            parse_ws_msg("UserId user-1", Arc::clone(&shared_model)),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg("Countdown 1", Arc::clone(&shared_model)),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&players_info).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert!(matches!(lock.game_status, Some(GameStatus::Playing)));
+    }
+
+    fn players_info_snapshot(
+        lobby_id: &str,
+        version: u64,
+        player_ids: &[&str],
+    ) -> PlayerInfoSnapshot {
+        let players = player_ids
+            .iter()
+            .map(|id| {
+                (
+                    (*id).to_string(),
+                    super::super::models::PlayerInfo {
+                        is_leader: *id == player_ids[0],
+                        wpm: 0.0,
+                        progress_percent: 0,
+                    },
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        PlayerInfoSnapshot {
+            lobby_id: lobby_id.to_string(),
+            version,
+            players,
+        }
     }
 
     #[derive(Debug, PartialEq, PartialOrd)]
