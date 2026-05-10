@@ -464,44 +464,6 @@ mod test {
         assert_eq!(lock.players_info, Some(fresh_players));
     }
 
-    #[test]
-    #[should_panic]
-    /// This test should panic because the lobby_id in PlayerInfoSnapshot was removed. This is
-    /// because now the backend will not let you join another group if you are already in a group.
-    /// You can therefore assume that the incoming player_info_snapshot is specific for the lobby
-    /// you are currently in, since the only way you can be in a lobby is that you leave the one you
-    /// are already in.
-    fn test_parse_ws_msg_players_info_accepts_lower_version_for_new_lobby() {
-        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
-
-        let old_lobby_players = players_info_snapshot(5, &["old-lobby-player"]);
-        let new_lobby_players = players_info_snapshot(1, &["new-lobby-player"]);
-
-        assert_eq!(
-            parse_ws_msg(
-                &format!(
-                    "PlayersInfo {}",
-                    serde_json::to_string(&old_lobby_players).unwrap()
-                ),
-                Arc::clone(&shared_model)
-            ),
-            Ok(())
-        );
-        assert_eq!(
-            parse_ws_msg(
-                &format!(
-                    "PlayersInfo {}",
-                    serde_json::to_string(&new_lobby_players).unwrap()
-                ),
-                Arc::clone(&shared_model)
-            ),
-            Ok(())
-        );
-
-        let lock = shared_model.read().unwrap();
-        assert_eq!(lock.players_info, Some(new_lobby_players));
-    }
-
     fn players_info_snapshot(version: u64, player_ids: &[&str]) -> PlayersInfoSnapshot {
         let players = player_ids
             .iter()
