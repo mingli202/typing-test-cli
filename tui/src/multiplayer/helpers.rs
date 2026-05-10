@@ -82,7 +82,7 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
                     let msg = match msg {
                         Ok(m) => m,
                         Err(_) => {
-                            return;
+                            break;
                         }
                     };
 
@@ -93,7 +93,7 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
                     let text = match msg.to_text() {
                         Ok(t) => t,
                         Err(_) => {
-                            return;
+                            break;
                         }
                     };
 
@@ -104,6 +104,8 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
                 }
             }
         }
+
+        cancel_token.cancel();
     });
 }
 
