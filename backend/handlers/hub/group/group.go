@@ -282,6 +282,10 @@ func (group *Group) startGame() {
 		return
 	}
 
+	if !group.broadcast(models.StartGameMessage{}) {
+		return
+	}
+
 	group.mu.RLock()
 	end := group.end
 	group.mu.RUnlock()

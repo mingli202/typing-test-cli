@@ -49,6 +49,8 @@ type CountdownMessage struct {
 	Countdown int
 }
 
+type StartGameMessage struct{}
+
 func (lobbyInfo LobbyInfo) ToMsg() (string, error) {
 	lobbyInfoStr, err := json.Marshal(lobbyInfo)
 
@@ -103,4 +105,8 @@ func (playerInfoSnapshot PlayersInfoSnapshot) ToMsg() (string, error) {
 
 func (countdown CountdownMessage) ToMsg() (string, error) {
 	return "Countdown " + strconv.Itoa(countdown.Countdown), nil
+}
+
+func (StartGameMessage) ToMsg() (string, error) {
+	return "StartGame", nil
 }

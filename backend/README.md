@@ -46,4 +46,5 @@ all the possible responses:
 - LeaveGroup (DidSucceed: bool)
 - PlayersInfo (PlayerInfoSnapshot)
 - Countdown (Countdown: int)
+- StartGame
 ```
