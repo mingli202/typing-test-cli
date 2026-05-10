@@ -164,12 +164,12 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             if let Some(lobby_info) = &mut lock.lobby_info {
                 lobby_info.data = new_game.data;
             }
-            lock.player_info = Some(new_game.players_info)
+            lock.players_info = Some(new_game.players_info)
         }
         "EndGame" => {
             let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
             let mut lock = shared_model.write().unwrap();
-            lock.player_info = Some(player_info);
+            lock.players_info = Some(player_info);
             lock.game_status = Some(GameStatus::End);
         }
         "Error" => {
@@ -231,16 +231,17 @@ fn parse_payload_json<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, S
 fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
     let mut lock = shared_model.write().unwrap();
 
-    lock.player_info = None;
+    lock.players_info = None;
     lock.lobby_info = None;
     lock.game_status = None;
 }
 
 /// updates the players if it's new
+/// if the player was in countdown, they are now playing
 fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayerInfoSnapshot) {
     let mut lock = shared_model.write().unwrap();
 
-    match &mut lock.player_info {
+    match &mut lock.players_info {
         Some(players) => {
             let is_same_lobby = players.lobby_id == incoming_players.lobby_id;
             let is_newer_version = players.version < incoming_players.version;
@@ -249,7 +250,15 @@ fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: Play
                 *players = incoming_players;
             }
         }
-        None => lock.player_info = Some(incoming_players),
+        None => lock.players_info = Some(incoming_players),
+    }
+
+    if let Some(GameStatus::Countdown(_)) = lock.game_status
+        && let Some(ref user_id) = lock.user_id
+        && let Some(ref players_info) = lock.players_info
+        && players_info.players.contains_key(user_id)
+    {
+        lock.game_status = Some(GameStatus::Playing);
     }
 }
 
