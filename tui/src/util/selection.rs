@@ -271,7 +271,7 @@ where
         selection_item.item.as_ref().map_or(span!(""), |item| {
             let span = Span::from(item.to_string())
                 .fg(Color::White)
-                .bg(Color::Black);
+                .bg(Color::Reset);
 
             if child_index == Some(i) {
                 if path_index == Some(selected_path_len - 1) {
