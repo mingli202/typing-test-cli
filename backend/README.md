@@ -30,7 +30,6 @@ some type definition:
 Data = { text: string, source: string }
 PlayerInfo = { is_leader: bool, wpm: float64, progress_percent: uint8 }
 PlayerInfoSnapshot = {
-  lobby_id: string,
   version: uint64,
   players: { [userId: string]: PlayerInfo }
 }
