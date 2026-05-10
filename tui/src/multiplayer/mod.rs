@@ -79,12 +79,14 @@ impl Drop for MultiplayerModel {
     }
 }
 
-pub fn update(model: &mut MultiplayerModel, msg: Msg) {
+pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
     match msg {
         Msg::Key(key) => {}
         Msg::Tick => {}
         _ => {}
-    }
+    };
+
+    None
 }
 
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {}
