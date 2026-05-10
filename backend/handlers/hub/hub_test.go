@@ -271,26 +271,8 @@ func TestHandleNewGroup(t *testing.T) {
 	}
 
 	lobby, err = hub.handleNewGroup(&u)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(hub.groups) != 1 {
-		t.Fatal("Should have added a new group but old group is gone")
-	}
-
-	if u.GroupId == nil || *u.GroupId != lobby.LobbyId {
-		t.Fatal("user groupid did not get set to the new group")
-	}
-
-	group2 := hub.groups[lobby.LobbyId]
-
-	if group2.Id() == group.Id() {
-		t.Fatalf("Impossible same group id")
-	}
-
-	if len(group2.GetUsersSnapshot()) != 1 {
-		t.Fatalf("User should have been added to the new group")
+	if err == nil {
+		t.Fatal("Should not have been able to join group while already in a group")
 	}
 }
 
@@ -329,7 +311,7 @@ func TestHandleJoin(t *testing.T) {
 	_, err = hub.handleJoin("random groupId", &user1)
 
 	if err == nil {
-		t.Fatalf("Group id not found, impossible")
+		t.Fatalf("Should not be able to join another group if already in group")
 	}
 
 	if len(group1.GetUsersSnapshot()) != 2 {
@@ -337,6 +319,9 @@ func TestHandleJoin(t *testing.T) {
 	}
 
 	// user1 makes another group
+	if err := hub.handleLeave(&user1); err != nil {
+		t.Fatal(err)
+	}
 	lobby2, err := hub.handleNewGroup(&user1)
 	if err != nil {
 		t.Fatal(err)
@@ -353,6 +338,9 @@ func TestHandleJoin(t *testing.T) {
 		t.Fatalf("User 1 should have left the first group")
 	}
 
+	if leaveErr := hub.handleLeave(&user2); leaveErr != nil {
+		t.Fatal(leaveErr)
+	}
 	_, err = hub.handleJoin(groupId2, &user2)
 	if err != nil {
 		t.Fatal(err)
@@ -791,6 +779,7 @@ func TestConcurrentJoinStability(t *testing.T) {
 					targetGroupID = groupId2
 				}
 
+				hub.handleLeave(u)
 				_, err := hub.handleJoin(targetGroupID, u)
 				if err != nil {
 					t.Errorf("join should succeed for valid group %s", targetGroupID)
@@ -998,6 +987,7 @@ func TestJoiningNewGroupWithLowerPlayerinfoVersion(t *testing.T) {
 	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
 
 	// Act
+	mockClientMsg(t, &hub, mockClient1, "LeaveGroup")
 	mockClientMsg(t, &hub, mockClient1, "NewGroup")
 
 	// Assert
