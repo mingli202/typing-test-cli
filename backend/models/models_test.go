@@ -37,7 +37,7 @@ func TestNewGameToMsg(t *testing.T) {
 	}
 
 	msg := mustMsg(t, newGame)
-	assertMsg(t, msg, `NewGame {"data":{"text":"qwer","source":"zxcv"},"players_info":{"lobby_id":"asdf","version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}}`)
+	assertMsg(t, msg, `NewGame {"data":{"text":"qwer","source":"zxcv"},"players_info":{"version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}}`)
 
 	var payload NewGame
 	unmarshalPayload(t, msg, "NewGame", &payload)
@@ -50,7 +50,7 @@ func TestEndGameToMsg(t *testing.T) {
 	}
 
 	msg := mustMsg(t, endGame)
-	assertMsg(t, msg, `EndGame {"lobby_id":"asdf","version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
+	assertMsg(t, msg, `EndGame {"version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
 
 	var payload PlayersInfoSnapshot
 	unmarshalPayload(t, msg, "EndGame", &payload)
@@ -100,7 +100,7 @@ func TestPlayersInfoSnapshotToMsg(t *testing.T) {
 	playersInfo := testPlayersInfoSnapshot()
 
 	msg := mustMsg(t, playersInfo)
-	assertMsg(t, msg, `PlayersInfo {"lobby_id":"asdf","version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
+	assertMsg(t, msg, `PlayersInfo {"version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
 
 	var payload PlayersInfoSnapshot
 	unmarshalPayload(t, msg, "PlayersInfo", &payload)
@@ -147,7 +147,6 @@ func unmarshalPayload(t *testing.T, msg, command string, target any) {
 
 func testPlayersInfoSnapshot() PlayersInfoSnapshot {
 	return PlayersInfoSnapshot{
-		LobbyId: "asdf",
 		Version: 1,
 		Players: map[string]PlayerInfo{
 			"player-1": {
@@ -166,10 +165,6 @@ func testPlayersInfoSnapshot() PlayersInfoSnapshot {
 
 func assertPlayersInfoSnapshot(t *testing.T, actual, expected PlayersInfoSnapshot) {
 	t.Helper()
-
-	if actual.LobbyId != expected.LobbyId {
-		t.Fatalf("expected lobby id %q, got %q", expected.LobbyId, actual.LobbyId)
-	}
 
 	if actual.Version != expected.Version {
 		t.Fatalf("expected version %d, got %d", expected.Version, actual.Version)

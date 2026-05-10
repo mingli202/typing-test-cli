@@ -80,7 +80,7 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 
 	switch cmd {
 	case "PlayersInfo":
-		if len(msg) < 2 {
+		if len(msgArr) < 2 {
 			t.Fatalf("msg doesn't have payload: %v", msg)
 		}
 
@@ -93,7 +93,7 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 
 		mockClient.updatePlayers(playerInfo)
 	case "LobbyInfo":
-		if len(msg) < 2 {
+		if len(msgArr) < 2 {
 			t.Fatalf("msg doesn't have payload: %v", msg)
 		}
 
@@ -105,6 +105,22 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 		}
 
 		mockClient.updateLobbyInfo(lobbyInfo)
+	case "LeaveGroup":
+		if len(msgArr) != 2 {
+			t.Fatalf("msg doesn't have payload: %v", msg)
+		}
+
+		didSucceed, err := strconv.ParseBool(msgArr[1])
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !didSucceed {
+			t.Fatal("Did not succeed leaving")
+		} else {
+			mockClient.clearLobbyData()
+		}
 	}
 }
 
@@ -126,13 +142,20 @@ func (mockClient *MockClient) updatePlayers(playerInfo models.PlayersInfoSnapsho
 	mockClient.mu.Lock()
 	defer mockClient.mu.Unlock()
 
-	isSameLobby := playerInfo.LobbyId == mockClient.playersInfo.LobbyId
 	isNewerPlayerInfoVersion := playerInfo.Version > mockClient.playersInfo.Version
 
-	if !isSameLobby || isNewerPlayerInfoVersion {
+	if isNewerPlayerInfoVersion {
 		mockClient.playersInfo = playerInfo
 	}
 
+}
+
+func (mockClient *MockClient) clearLobbyData() {
+	mockClient.mu.Lock()
+	defer mockClient.mu.Unlock()
+
+	mockClient.playersInfo = models.PlayersInfoSnapshot{}
+	mockClient.lobbyInfo = models.LobbyInfo{}
 }
 
 func TestMockClientUpdatePlayersIgnoresStaleAndDuplicateVersion(t *testing.T) {
