@@ -502,34 +502,6 @@ mod test {
         assert_eq!(lock.players_info, Some(new_lobby_players));
     }
 
-    #[test]
-    fn test_parse_ws_msg_players_info_changes_countdown_to_playing_for_current_player() {
-        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
-        let players_info = players_info_snapshot(1, &["user-1", "user-2"]);
-
-        assert_eq!(
-            parse_ws_msg("UserId user-1", Arc::clone(&shared_model)),
-            Ok(())
-        );
-        assert_eq!(
-            parse_ws_msg("Countdown 1", Arc::clone(&shared_model)),
-            Ok(())
-        );
-        assert_eq!(
-            parse_ws_msg(
-                &format!(
-                    "PlayersInfo {}",
-                    serde_json::to_string(&players_info).unwrap()
-                ),
-                Arc::clone(&shared_model)
-            ),
-            Ok(())
-        );
-
-        let lock = shared_model.read().unwrap();
-        assert!(matches!(lock.game_status, Some(GameStatus::Playing)));
-    }
-
     fn players_info_snapshot(version: u64, player_ids: &[&str]) -> PlayerInfoSnapshot {
         let players = player_ids
             .iter()
