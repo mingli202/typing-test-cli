@@ -78,26 +78,33 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                Some(msg) = read.next() => {
-                    let msg = match msg {
-                        Ok(m) => m,
-                        Err(_) => {
+                msg = read.next() => {
+                    match msg {
+                        Some(msg) => {
+                            let msg = match msg {
+                                Ok(m) => m,
+                                Err(_) => {
+                                    break;
+                                }
+                            };
+
+                            if !msg.is_text() {
+                                continue;
+                            }
+
+                            let text = match msg.to_text() {
+                                Ok(t) => t,
+                                Err(_) => {
+                                    break;
+                                }
+                            };
+
+                            let _ = read_tx.send(text.to_string());
+                        },
+                        None => {
                             break;
                         }
-                    };
-
-                    if !msg.is_text() {
-                        continue;
                     }
-
-                    let text = match msg.to_text() {
-                        Ok(t) => t,
-                        Err(_) => {
-                            break;
-                        }
-                    };
-
-                    let _ = read_tx.send(text.to_string());
                 }
                 _ = cancel_token.cancelled() => {
                     return
