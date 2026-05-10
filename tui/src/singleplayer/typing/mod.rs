@@ -5,7 +5,10 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Offset, Rect};
 use ratatui::macros::{line, text};
 use ratatui::style::{Color, Stylize};
+use ratatui::text::Line;
 use ratatui::widgets::Widget;
+
+use crate::util::view_helpers;
 
 use self::mode_selection::ModeSelection;
 use self::typing::TypingTest;
@@ -207,15 +210,12 @@ fn view_stats(
 
 /// Render some instructions
 fn view_bottom_menu_typing(area: Rect, buf: &mut Buffer) {
-    let text = text![
-        line!("Next <Tab>  Quit <Esc>  PVP <C-p>"),
-        line!("Select mode <Up/Down/Left/Right>"),
-    ]
-    .fg(Color::DarkGray)
-    .centered();
-
-    let mut menu_area = area.centered_horizontally(Constraint::Length(text.width() as u16));
-    menu_area.y = area.bottom().saturating_sub(text.height() as u16);
-
-    text.render(menu_area, buf);
+    view_helpers::view_bottom_menu(
+        &[
+            "Next <Tab>  Quit <Esc>  PVP <C-p>",
+            "Select mode <Up/Down/Left/Right>",
+        ],
+        area,
+        buf,
+    );
 }
