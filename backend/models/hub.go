@@ -20,6 +20,7 @@ type PlayerInfo struct {
 }
 
 type PlayersInfoSnapshot struct {
+	LobbyId string                `json:"lobby_id"`
 	Version uint64                `json:"version"`
 	Players map[string]PlayerInfo `json:"players"`
 }

@@ -339,6 +339,7 @@ func (group *Group) getPlayerInfoSnapshot() models.PlayersInfoSnapshot {
 	}
 
 	return models.PlayersInfoSnapshot{
+		LobbyId: group.id,
 		Version: v,
 		Players: playerInfo,
 	}
