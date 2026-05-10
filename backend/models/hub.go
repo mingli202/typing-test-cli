@@ -71,13 +71,13 @@ func (newGame NewGame) ToMsg() (string, error) {
 }
 
 func (endGame EndGame) ToMsg() (string, error) {
-	playerInfo, err := endGame.FinalPlayersInfo.ToMsg()
+	playerInfoBytes, err := json.Marshal(endGame.FinalPlayersInfo)
 
 	if err != nil {
 		return "", err
 	}
 
-	return "EndGame " + playerInfo, nil
+	return "EndGame " + string(playerInfoBytes), nil
 }
 
 func (err ErrorMessage) ToMsg() (string, error) {
