@@ -238,21 +238,23 @@ fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
 
 /// updates the players if it's new
 /// if the player was in countdown, they are now playing
+/// the incoming_playings will always be specific to the current group the user is in because the
+/// backend will not allow the user to join another group if the user is already in a group.
 fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayerInfoSnapshot) {
     let mut lock = shared_model.write().unwrap();
 
     match &mut lock.players_info {
         Some(players) => {
-            let is_same_lobby = players.lobby_id == incoming_players.lobby_id;
             let is_newer_version = players.version < incoming_players.version;
 
-            if !is_same_lobby || is_newer_version {
+            if is_newer_version {
                 *players = incoming_players;
             }
         }
         None => lock.players_info = Some(incoming_players),
     }
 
+    // if the player was waiting for the countdown and if the user is part of the players then they should be playing
     if let Some(GameStatus::Countdown(_)) = lock.game_status
         && let Some(ref user_id) = lock.user_id
         && let Some(ref players_info) = lock.players_info
@@ -396,7 +398,7 @@ mod test {
                 source: "source".to_string(),
             },
         };
-        let players_info = players_info_snapshot("lobby-1", 1, &["user-1"]);
+        let players_info = players_info_snapshot(1, &["user-1"]);
 
         assert_eq!(
             parse_ws_msg("UserId user-1", Arc::clone(&shared_model)),
@@ -440,8 +442,8 @@ mod test {
     fn test_parse_ws_msg_players_info_ignores_stale_snapshot_for_same_lobby() {
         let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
 
-        let fresh_players = players_info_snapshot("lobby-1", 2, &["new-player"]);
-        let stale_players = players_info_snapshot("lobby-1", 1, &["old-player"]);
+        let fresh_players = players_info_snapshot(2, &["new-player"]);
+        let stale_players = players_info_snapshot(1, &["old-player"]);
 
         assert_eq!(
             parse_ws_msg(
@@ -469,11 +471,17 @@ mod test {
     }
 
     #[test]
+    #[should_panic]
+    /// This test should panic because the lobby_id in PlayerInfoSnapshot was removed. This is
+    /// because now the backend will not let you join another group if you are already in a group.
+    /// You can therefore assume that the incoming player_info_snapshot is specific for the lobby
+    /// you are currently in, since the only way you can be in a lobby is that you leave the one you
+    /// are already in.
     fn test_parse_ws_msg_players_info_accepts_lower_version_for_new_lobby() {
         let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
 
-        let old_lobby_players = players_info_snapshot("lobby-1", 5, &["old-lobby-player"]);
-        let new_lobby_players = players_info_snapshot("lobby-2", 1, &["new-lobby-player"]);
+        let old_lobby_players = players_info_snapshot(5, &["old-lobby-player"]);
+        let new_lobby_players = players_info_snapshot(1, &["new-lobby-player"]);
 
         assert_eq!(
             parse_ws_msg(
@@ -503,7 +511,7 @@ mod test {
     #[test]
     fn test_parse_ws_msg_players_info_changes_countdown_to_playing_for_current_player() {
         let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
-        let players_info = players_info_snapshot("lobby-1", 1, &["user-1", "user-2"]);
+        let players_info = players_info_snapshot(1, &["user-1", "user-2"]);
 
         assert_eq!(
             parse_ws_msg("UserId user-1", Arc::clone(&shared_model)),
@@ -528,11 +536,7 @@ mod test {
         assert!(matches!(lock.game_status, Some(GameStatus::Playing)));
     }
 
-    fn players_info_snapshot(
-        lobby_id: &str,
-        version: u64,
-        player_ids: &[&str],
-    ) -> PlayerInfoSnapshot {
+    fn players_info_snapshot(version: u64, player_ids: &[&str]) -> PlayerInfoSnapshot {
         let players = player_ids
             .iter()
             .map(|id| {
@@ -547,11 +551,7 @@ mod test {
             })
             .collect::<HashMap<_, _>>();
 
-        PlayerInfoSnapshot {
-            lobby_id: lobby_id.to_string(),
-            version,
-            players,
-        }
+        PlayerInfoSnapshot { version, players }
     }
 
     #[derive(Debug, PartialEq, PartialOrd)]
