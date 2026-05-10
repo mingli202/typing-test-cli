@@ -191,9 +191,8 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             clear_shared_model(shared_model);
         }
         "PlayersInfo" => {
-            let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
-            let mut lock = shared_model.write().unwrap();
-            lock.player_info = Some(player_info);
+            let incoming_players = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
+            update_players(shared_model, incoming_players);
         }
         "Countdown" => {
             let countdown = parse_payload_json::<i8>(&words)?;
@@ -235,6 +234,23 @@ fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
     lock.player_info = None;
     lock.lobby_info = None;
     lock.game_status = None;
+}
+
+/// updates the players if it's new
+fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayerInfoSnapshot) {
+    let mut lock = shared_model.write().unwrap();
+
+    match &mut lock.player_info {
+        Some(players) => {
+            let is_same_lobby = players.lobby_id == incoming_players.lobby_id;
+            let is_newer_version = players.version < incoming_players.version;
+
+            if !is_same_lobby || is_newer_version {
+                *players = incoming_players;
+            }
+        }
+        None => lock.player_info = Some(incoming_players),
+    }
 }
 
 #[cfg(test)]
