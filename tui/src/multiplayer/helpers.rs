@@ -255,7 +255,8 @@ fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: Play
     }
 
     // if the player was waiting for the countdown and if the user is part of the players then they should be playing
-    if let Some(GameStatus::Countdown(_)) = lock.game_status
+    if let Some(GameStatus::Countdown(countdown)) = lock.game_status
+        && countdown == 0
         && let Some(ref user_id) = lock.user_id
         && let Some(ref players_info) = lock.players_info
         && players_info.players.contains_key(user_id)
