@@ -33,11 +33,18 @@ func newHub(dataProvider *data_provider.DataProvider) Hub {
 }
 
 // Makes a new group and adds the given user to it
+// If the user is already in a group, delete the newly created group
 // Returns the lobbyInfo on success
 func (hub *Hub) handleNewGroup(u *user.User) (models.LobbyInfo, error) {
 	group := hub.newGroup()
 
 	lobbyInfo, err := hub.handleJoin(group.Id(), u)
+
+	if err != nil {
+		hub.mu.Lock()
+		delete(hub.groups, group.Id())
+		hub.mu.Unlock()
+	}
 
 	return lobbyInfo, err
 }
