@@ -26,17 +26,17 @@ var dataProvider = &dataProviderNoRef
 // A mock client
 type MockClient struct {
 	mu          sync.Mutex
-	playersInfo models.PlayerInfoSnapshot
+	playersInfo models.PlayersInfoSnapshot
 	lobbyInfo   models.LobbyInfo
 	u           *user.User
-	ch          chan []byte
+	ch          chan models.Message
 	wg          sync.WaitGroup
 }
 
 func newMockClient() *MockClient {
 	u := user.NewUser(nil)
 
-	ch := make(chan []byte)
+	ch := make(chan models.Message)
 
 	u.SetCh(ch)
 
@@ -57,10 +57,14 @@ func (mockClient *MockClient) close() {
 
 func (mockClient *MockClient) listen(t *testing.T) {
 	go func() {
-		for p := range mockClient.ch {
-			msg := string(p)
+		for msg := range mockClient.ch {
+			str, errMsg := msg.ToMsg()
 
-			mockClient.handleMsg(t, msg)
+			if errMsg != nil {
+				str, _ = models.ErrorMessage{Err: errMsg}.ToMsg()
+			}
+
+			mockClient.handleMsg(t, str)
 		}
 	}()
 }
@@ -75,21 +79,21 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 	cmd := msgArr[0]
 
 	switch cmd {
-	case "UpdatePlayers":
-		if len(msg) < 2 {
+	case "PlayersInfo":
+		if len(msgArr) < 2 {
 			t.Fatalf("msg doesn't have payload: %v", msg)
 		}
 
 		playerInfoStr := strings.Join(msgArr[1:], " ")
 
-		var playerInfo models.PlayerInfoSnapshot
+		var playerInfo models.PlayersInfoSnapshot
 		if err := json.Unmarshal([]byte(playerInfoStr), &playerInfo); err != nil {
 			t.Fatalf("unmarshal error: %v", err)
 		}
 
 		mockClient.updatePlayers(playerInfo)
 	case "LobbyInfo":
-		if len(msg) < 2 {
+		if len(msgArr) < 2 {
 			t.Fatalf("msg doesn't have payload: %v", msg)
 		}
 
@@ -101,6 +105,22 @@ func (mockClient *MockClient) handleMsg(t *testing.T, msg string) {
 		}
 
 		mockClient.updateLobbyInfo(lobbyInfo)
+	case "LeaveGroup":
+		if len(msgArr) != 2 {
+			t.Fatalf("msg doesn't have payload: %v", msg)
+		}
+
+		didSucceed, err := strconv.ParseBool(msgArr[1])
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !didSucceed {
+			t.Fatal("Did not succeed leaving")
+		} else {
+			mockClient.clearLobbyData()
+		}
 	}
 }
 
@@ -118,17 +138,24 @@ func (mockClient *MockClient) getLobbyInfo() models.LobbyInfo {
 	return mockClient.lobbyInfo
 }
 
-func (mockClient *MockClient) updatePlayers(playerInfo models.PlayerInfoSnapshot) {
+func (mockClient *MockClient) updatePlayers(playerInfo models.PlayersInfoSnapshot) {
 	mockClient.mu.Lock()
 	defer mockClient.mu.Unlock()
 
-	isSameLobby := playerInfo.LobbyId == mockClient.playersInfo.LobbyId
 	isNewerPlayerInfoVersion := playerInfo.Version > mockClient.playersInfo.Version
 
-	if !isSameLobby || isNewerPlayerInfoVersion {
+	if isNewerPlayerInfoVersion {
 		mockClient.playersInfo = playerInfo
 	}
 
+}
+
+func (mockClient *MockClient) clearLobbyData() {
+	mockClient.mu.Lock()
+	defer mockClient.mu.Unlock()
+
+	mockClient.playersInfo = models.PlayersInfoSnapshot{}
+	mockClient.lobbyInfo = models.LobbyInfo{}
 }
 
 func TestMockClientUpdatePlayersIgnoresStaleAndDuplicateVersion(t *testing.T) {
@@ -144,15 +171,15 @@ func TestMockClientUpdatePlayersIgnoresStaleAndDuplicateVersion(t *testing.T) {
 		"u-dup": {IsLeader: false, Wpm: 99, ProgressPercent: 99},
 	}
 
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 3,
 		Players: freshPlayers,
 	})
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 2,
 		Players: stalePlayers,
 	})
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 3,
 		Players: duplicatePlayers,
 	})
@@ -166,14 +193,14 @@ func TestMockClientUpdatePlayersIgnoresStaleAndDuplicateVersion(t *testing.T) {
 func TestMockClientUpdatePlayersAppliesNewerEmptySnapshot(t *testing.T) {
 	mockClient := newMockClient()
 
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 4,
 		Players: map[string]models.PlayerInfo{
 			"u1": {IsLeader: true, Wpm: 60, ProgressPercent: 80},
 		},
 	})
 
-	mockClient.updatePlayers(models.PlayerInfoSnapshot{
+	mockClient.updatePlayers(models.PlayersInfoSnapshot{
 		Version: 5,
 		Players: map[string]models.PlayerInfo{},
 	})
@@ -187,7 +214,7 @@ func TestMockClientUpdatePlayersAppliesNewerEmptySnapshot(t *testing.T) {
 func TestMockClientHandleMsgOutOfOrderUpdatePlayers(t *testing.T) {
 	mockClient := newMockClient()
 
-	oldPayload, err := json.Marshal(models.PlayerInfoSnapshot{
+	oldPayload, err := json.Marshal(models.PlayersInfoSnapshot{
 		Version: 7,
 		Players: map[string]models.PlayerInfo{
 			"u-old": {IsLeader: false, Wpm: 40, ProgressPercent: 40},
@@ -197,7 +224,7 @@ func TestMockClientHandleMsgOutOfOrderUpdatePlayers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newPayload, err := json.Marshal(models.PlayerInfoSnapshot{
+	newPayload, err := json.Marshal(models.PlayersInfoSnapshot{
 		Version: 8,
 		Players: map[string]models.PlayerInfo{
 			"u-new": {IsLeader: true, Wpm: 85, ProgressPercent: 95},
@@ -207,8 +234,8 @@ func TestMockClientHandleMsgOutOfOrderUpdatePlayers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mockClient.handleMsg(t, "UpdatePlayers "+string(newPayload))
-	mockClient.handleMsg(t, "UpdatePlayers "+string(oldPayload))
+	mockClient.handleMsg(t, "PlayersInfo "+string(newPayload))
+	mockClient.handleMsg(t, "PlayersInfo "+string(oldPayload))
 
 	got := mockClient.getPlayers()
 	want := map[string]models.PlayerInfo{
@@ -267,26 +294,8 @@ func TestHandleNewGroup(t *testing.T) {
 	}
 
 	lobby, err = hub.handleNewGroup(&u)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(hub.groups) != 1 {
-		t.Fatal("Should have added a new group but old group is gone")
-	}
-
-	if u.GroupId == nil || *u.GroupId != lobby.LobbyId {
-		t.Fatal("user groupid did not get set to the new group")
-	}
-
-	group2 := hub.groups[lobby.LobbyId]
-
-	if group2.Id() == group.Id() {
-		t.Fatalf("Impossible same group id")
-	}
-
-	if len(group2.GetUsersSnapshot()) != 1 {
-		t.Fatalf("User should have been added to the new group")
+	if err == nil {
+		t.Fatal("Should not have been able to join group while already in a group")
 	}
 }
 
@@ -325,7 +334,7 @@ func TestHandleJoin(t *testing.T) {
 	_, err = hub.handleJoin("random groupId", &user1)
 
 	if err == nil {
-		t.Fatalf("Group id not found, impossible")
+		t.Fatalf("Should not be able to join another group if already in group")
 	}
 
 	if len(group1.GetUsersSnapshot()) != 2 {
@@ -333,6 +342,9 @@ func TestHandleJoin(t *testing.T) {
 	}
 
 	// user1 makes another group
+	if err := hub.handleLeave(&user1); err != nil {
+		t.Fatal(err)
+	}
 	lobby2, err := hub.handleNewGroup(&user1)
 	if err != nil {
 		t.Fatal(err)
@@ -349,6 +361,9 @@ func TestHandleJoin(t *testing.T) {
 		t.Fatalf("User 1 should have left the first group")
 	}
 
+	if leaveErr := hub.handleLeave(&user2); leaveErr != nil {
+		t.Fatal(leaveErr)
+	}
 	_, err = hub.handleJoin(groupId2, &user2)
 	if err != nil {
 		t.Fatal(err)
@@ -387,7 +402,13 @@ func TestHandleMessageNewGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lobbyStr := strings.Join(strings.Split(res, " ")[1:], " ")
+	msgStr, errMsg := res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	lobbyStr := strings.Join(strings.Split(msgStr, " ")[1:], " ")
 
 	var lobby models.LobbyInfo
 	if err := json.Unmarshal([]byte(lobbyStr), &lobby); err != nil {
@@ -431,7 +452,13 @@ func TestHandleMessageJoinGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lobbyStr := strings.Join(strings.Split(res, " ")[1:], " ")
+	msgStr, errMsg := res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	lobbyStr := strings.Join(strings.Split(msgStr, " ")[1:], " ")
 
 	var joinLobby models.LobbyInfo
 	if err := json.Unmarshal([]byte(lobbyStr), &joinLobby); err != nil {
@@ -475,7 +502,13 @@ func TestHandleMessageLeaveGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	success, err := strconv.ParseBool(res)
+	msgStr, errMsg := res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	success, err := strconv.ParseBool(strings.Join(strings.Split(msgStr, " ")[1:], " "))
 
 	if err != nil {
 		t.Fatal(err)
@@ -492,7 +525,14 @@ func TestHandleMessageLeaveGroup(t *testing.T) {
 	}
 
 	res, _ = hub.handleMessage([]byte(msg), &user1)
-	success, _ = strconv.ParseBool(res)
+
+	msgStr, errMsg = res.ToMsg()
+
+	if errMsg != nil {
+		t.Fatal(err)
+	}
+
+	success, _ = strconv.ParseBool(strings.Join(strings.Split(msgStr, " ")[1:], " "))
 	if success == false {
 		t.Fatal("Unsuccessful leave")
 	}
@@ -762,6 +802,7 @@ func TestConcurrentJoinStability(t *testing.T) {
 					targetGroupID = groupId2
 				}
 
+				hub.handleLeave(u)
 				_, err := hub.handleJoin(targetGroupID, u)
 				if err != nil {
 					t.Errorf("join should succeed for valid group %s", targetGroupID)
@@ -969,6 +1010,7 @@ func TestJoiningNewGroupWithLowerPlayerinfoVersion(t *testing.T) {
 	mockClientMsg(t, &hub, mockClient2, "JoinGroup "+groupId)
 
 	// Act
+	mockClientMsg(t, &hub, mockClient1, "LeaveGroup")
 	mockClientMsg(t, &hub, mockClient1, "NewGroup")
 
 	// Assert
@@ -985,8 +1027,8 @@ func mockClientMsg(t *testing.T, hub *Hub, mockUser *MockClient, msg string) {
 	res, err := hub.handleMessage([]byte(msg), u)
 
 	if err != nil {
-		u.SendMsg(err.Error())
-	} else if res != "" {
+		u.SendMsg(models.ErrorMessage{Err: err})
+	} else if res != nil {
 		u.SendMsg(res)
 	}
 

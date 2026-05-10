@@ -122,10 +122,10 @@ impl Toast {
 
                 // cap toast length if it ever gets spammed
                 // 20 is an arbritary number
-                if self.messages.len() > 20 {
-                    if let Some((_, handle)) = self.messages.pop_back() {
-                        handle.abort();
-                    }
+                if self.messages.len() > 20
+                    && let Some((_, handle)) = self.messages.pop_back()
+                {
+                    handle.abort();
                 }
             }
             ToastAction::Pop => {

@@ -3,10 +3,11 @@ use std::fs;
 
 use rand::RngExt;
 use rand::seq::IndexedRandom;
+use serde::{Deserialize, Serialize};
 
-use crate::model::Mode;
+use crate::singleplayer::Mode;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct Data {
     pub text: String,
     pub source: String,
@@ -178,8 +179,7 @@ mod test {
         let data = provider.get_n_random_words(5);
 
         assert_eq!(
-            data.text,
-            "No words found",
+            data.text, "No words found",
             "empty datasets should use the fallback message"
         );
         assert_eq!(data.source, "No words found");

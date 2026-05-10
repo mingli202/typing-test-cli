@@ -15,10 +15,10 @@ use self::util::toast::ToastAction;
 
 pub mod action;
 pub mod args;
-mod endscreen;
 mod model;
 mod msg;
-mod typing;
+mod multiplayer;
+mod singleplayer;
 mod util;
 
 pub enum CustomEvent {

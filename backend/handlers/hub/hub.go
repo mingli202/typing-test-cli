@@ -33,11 +33,18 @@ func newHub(dataProvider *data_provider.DataProvider) Hub {
 }
 
 // Makes a new group and adds the given user to it
+// If the user is already in a group, delete the newly created group
 // Returns the lobbyInfo on success
 func (hub *Hub) handleNewGroup(u *user.User) (models.LobbyInfo, error) {
 	group := hub.newGroup()
 
 	lobbyInfo, err := hub.handleJoin(group.Id(), u)
+
+	if err != nil {
+		hub.mu.Lock()
+		delete(hub.groups, group.Id())
+		hub.mu.Unlock()
+	}
 
 	return lobbyInfo, err
 }
@@ -55,7 +62,7 @@ func (hub *Hub) handleLeave(u *user.User) error {
 }
 
 // Appends the given conn to the group with the given id
-// If the user is already in a group, they will be removed from it
+// If the user is already in a group, return an error
 // If successful, notify group that a new user has joined
 // Return the lobbyInfo on succesful join
 func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, error) {
@@ -63,26 +70,15 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, erro
 	defer hub.mu.Unlock()
 
 	oldGroupId := u.GroupId
-	isJoiningSameGroup := oldGroupId != nil && *oldGroupId == groupId
 
-	// asserts the joining group is not the same as the one already present
-	if isJoiningSameGroup {
-		return models.LobbyInfo{}, fmt.Errorf("How can you join the same group?")
+	if oldGroupId != nil {
+		return models.LobbyInfo{}, fmt.Errorf("Already in a group, leave the group before joining a new one!")
 	}
 
 	group, err := hub.canJoinGroupLocked(groupId, u)
 
 	if err != nil {
 		return models.LobbyInfo{}, err
-	}
-
-	// leaves old group knowing that it's a different group (if any)
-	// but only if the joining was successful
-	if oldGroupId != nil {
-		if oldGroup, _ := hub.leaveLocked(*oldGroupId, u); oldGroup != nil {
-			oldGroup.SendUpdatePlayers()
-		}
-
 	}
 
 	group.AddUser(u)
@@ -247,7 +243,7 @@ All Functions:
 
 - UpdateStats <Wpm> <Progress>
 */
-func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
+func (hub *Hub) handleMessage(p []byte, u *user.User) (models.Message, error) {
 	msg := string(p)
 	words := strings.Split(msg, " ")
 
@@ -257,43 +253,24 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 	case "NewGroup":
 		lobbyInfo, err := hub.handleNewGroup(u)
 
-		if err != nil {
-			return "", err
-		}
-
-		str, err := lobbyInfo.ToMsg()
-		if err != nil {
-			return "", err
-		}
-
-		return str, nil
+		return lobbyInfo, err
 
 	case "JoinGroup":
 		if len(words) != 2 {
-			return "", fmt.Errorf("Format must be JoinGroup <Id>")
+			return nil, fmt.Errorf("Format must be JoinGroup <Id>")
 		}
 
 		id := words[1]
 		lobbyInfo, err := hub.handleJoin(id, u)
-		if err != nil {
-			return "", err
-		}
 
-		str, err := lobbyInfo.ToMsg()
-		if err != nil {
-			return "", err
-		}
-
-		return str, nil
+		return lobbyInfo, err
 
 	case "LeaveGroup":
 		err := hub.handleLeave(u)
-		return strconv.FormatBool(err == nil), err
-	case "Match":
-		return "", nil
+		return models.LeaveGroupMessage{DidSucceed: err == nil}, nil
 	case "UpdateStats":
 		if len(words) != 3 {
-			return "", fmt.Errorf("Format must be UpdateStates <Wpm> <Progress>")
+			return nil, fmt.Errorf("Format must be UpdateStates <Wpm> <Progress>")
 		}
 
 		wpmStr := words[1]
@@ -302,26 +279,26 @@ func (hub *Hub) handleMessage(p []byte, u *user.User) (string, error) {
 		wpm, err := strconv.ParseFloat(wpmStr, 64)
 
 		if err != nil || wpm < 0 {
-			return "", fmt.Errorf("<Wpm> must be a positive float")
+			return nil, fmt.Errorf("<Wpm> must be a positive float")
 		}
 
 		progress, err := strconv.ParseInt(progressStr, 10, 8)
 
 		if err != nil || progress < 0 || progress > 100 {
-			return "", fmt.Errorf("<Progress> must be a positive int between 0 and 100")
+			return nil, fmt.Errorf("<Progress> must be a positive int between 0 and 100")
 		}
 
 		err = hub.handleUpdateStats(u, wpm, uint8(progress))
 
-		return "", err
+		return nil, err
 
 	case "StartGame":
 		err := hub.handleStartGame(u)
 
-		return "", err
+		return nil, err
 
 	default:
-		return "", FunctionNotFoundError{Fn: function}
+		return nil, FunctionNotFoundError{Fn: function}
 	}
 }
 
@@ -344,7 +321,7 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// sends the user id to identify itself
-	user.SendMsg("UserId " + user.Id())
+	user.SendMsg(models.UserIdMessage{UserId: user.Id()})
 
 	// listen for incoming messages in current goroutine
 	for {
@@ -362,10 +339,8 @@ func (hub *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		returnMessage, err := hub.handleMessage(p, &user)
 
 		if err != nil {
-			returnMessage = ErrorMessage{Msg: err.Error()}.Error()
-		}
-
-		if returnMessage != "" {
+			user.SendMsg(models.ErrorMessage{Err: err})
+		} else if returnMessage != nil {
 			user.SendMsg(returnMessage)
 		}
 

@@ -5,7 +5,7 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use serde::{Deserialize, Serialize};
 
 use crate::CustomEvent;
-use crate::model::Mode;
+use crate::singleplayer::Mode;
 
 use super::toast::{self, ToastMessage};
 

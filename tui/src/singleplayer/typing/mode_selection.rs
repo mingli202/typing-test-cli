@@ -4,7 +4,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
 
-use crate::model::Mode;
+use super::Mode;
 use crate::util::selection::{self, Selection, SelectionItem};
 
 #[derive(PartialEq, Clone)]
