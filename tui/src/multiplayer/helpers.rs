@@ -187,6 +187,8 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             if !did_succeed {
                 return Err("Something went wrong leaving the group".to_string());
             }
+
+            clear_shared_model(shared_model);
         }
         "PlayersInfo" => {
             let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
@@ -224,6 +226,15 @@ fn parse_payload_json<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, S
     let payload = get_payload_from_words(words)?;
 
     serde_json::from_str::<T>(&payload).map_err(|err| err.to_string())
+}
+
+/// clear the game state when leaving
+fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
+    let mut lock = shared_model.write().unwrap();
+
+    lock.player_info = None;
+    lock.lobby_info = None;
+    lock.game_status = None;
 }
 
 #[cfg(test)]
