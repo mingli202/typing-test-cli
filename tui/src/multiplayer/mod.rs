@@ -57,12 +57,16 @@ impl MultiplayerModel {
 
     /// Sends the given message to the websocket
     pub fn send_msg(&self, msg: WsMsg) {
-        if let WsMsg::JoinGroup(group_id) = &msg {
-            let mut lock = self.shared_model.write().unwrap();
-            lock.pending_join_lobby_id = Some(group_id.clone());
-        }
+        let pending_join_lobby_id = match &msg {
+            WsMsg::JoinGroup(group_id) => Some(group_id.clone()),
+            _ => None,
+        };
+        let did_send = self.write_tx.send(msg.to_string()).is_ok();
 
-        let _ = self.write_tx.send(msg.to_string());
+        if did_send && let Some(group_id) = pending_join_lobby_id {
+            let mut lock = self.shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some(group_id);
+        }
     }
 }
 
