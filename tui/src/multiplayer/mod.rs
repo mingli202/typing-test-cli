@@ -9,7 +9,7 @@ use crate::CustomEvent;
 use crate::msg::Msg;
 
 use self::helpers::connect_to_ws;
-use self::models::{LobbyInfo, PlayerInfoSnapshot, WsMsg};
+use self::models::{LobbyInfo, PlayersInfoSnapshot, WsMsg};
 
 mod helpers;
 mod models;
@@ -24,7 +24,9 @@ pub enum GameStatus {
 #[derive(Default)]
 pub struct SharedModel {
     user_id: Option<String>,
-    player_info: Option<PlayerInfoSnapshot>,
+    active_lobby_id: Option<String>,
+    pending_join_lobby_id: Option<String>,
+    players_info: Option<PlayersInfoSnapshot>,
     lobby_info: Option<LobbyInfo>,
     game_status: Option<GameStatus>,
 }
@@ -56,9 +58,18 @@ impl MultiplayerModel {
         model
     }
 
-    // Sends the given message to the websocket
+    /// Sends the given message to the websocket
     pub fn send_msg(&self, msg: WsMsg) {
-        let _ = self.write_tx.send(msg.to_string());
+        let pending_join_lobby_id = match &msg {
+            WsMsg::JoinGroup(group_id) => Some(group_id.clone()),
+            _ => None,
+        };
+        let did_send = self.write_tx.send(msg.to_string()).is_ok();
+
+        if did_send && let Some(group_id) = pending_join_lobby_id {
+            let mut lock = self.shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some(group_id);
+        }
     }
 }
 

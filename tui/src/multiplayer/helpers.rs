@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use crate::CustomEvent;
 use crate::util::toast::{self, ToastMessage};
 
-use super::models::{LobbyInfo, NewGame, PlayerInfoSnapshot};
+use super::models::{LobbyInfo, NewGame, PlayersInfoSnapshot};
 use super::{GameStatus, SharedModel};
 
 /// Connects to the ws
@@ -21,9 +21,22 @@ pub async fn connect_to_ws(
     event_tx: UnboundedSender<CustomEvent>,
     write_rx: UnboundedReceiver<String>,
 ) {
-    let request = "ws://localhost:8080/ws".into_client_request().unwrap();
+    let request = match "ws://localhost:8080/ws".into_client_request() {
+        Ok(res) => res,
+        Err(e) => {
+            let _ = toast::send(&event_tx, ToastMessage::error(e.to_string()));
+            return;
+        }
+    };
 
-    let (stream, _) = connect_async(request).await.unwrap();
+    let (stream, _) = match connect_async(request).await {
+        Ok(ok) => ok,
+        Err(e) => {
+            let _ = toast::send(&event_tx, ToastMessage::error(e.to_string()));
+            return;
+        }
+    };
+
     let (write, read) = stream.split();
 
     let (read_tx, read_rx) = mpsc::unbounded_channel::<String>();
@@ -65,32 +78,41 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                Some(msg) = read.next() => {
-                    let msg = match msg {
-                        Ok(m) => m,
-                        Err(_) => {
-                            return;
-                        }
-                    };
+                msg = read.next() => {
+                    match msg {
+                        Some(msg) => {
+                            let msg = match msg {
+                                Ok(m) => m,
+                                Err(_) => {
+                                    break;
+                                }
+                            };
 
-                    if !msg.is_text() {
-                        return;
+                            if !msg.is_text() {
+                                continue;
+                            }
+
+                            let text = match msg.to_text() {
+                                Ok(t) => t,
+                                Err(_) => {
+                                    break;
+                                }
+                            };
+
+                            let _ = read_tx.send(text.to_string());
+                        },
+                        None => {
+                            break;
+                        }
                     }
-
-                    let text = match msg.to_text() {
-                        Ok(t) => t,
-                        Err(_) => {
-                            return;
-                        }
-                    };
-
-                    let _ = read_tx.send(text.to_string());
                 }
                 _ = cancel_token.cancelled() => {
                     return
                 }
             }
         }
+
+        cancel_token.cancel();
     });
 }
 
@@ -122,7 +144,7 @@ fn init_recv_msg_task(
 fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(), String> {
     let words: Vec<&str> = msg.split(" ").collect();
 
-    if words.is_empty() {
+    if words.is_empty() || words[0].is_empty() {
         return Err("msg did not contain a cmd".to_string());
     }
 
@@ -132,8 +154,13 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
         "LobbyInfo" => {
             let lobby_info = parse_payload_json::<LobbyInfo>(&words)?;
             let mut lock = shared_model.write().unwrap();
+            let lobby_id = lobby_info.lobby_id.clone();
 
             lock.lobby_info = Some(lobby_info);
+            lock.active_lobby_id = Some(lobby_id.clone());
+            if lock.pending_join_lobby_id.as_deref() == Some(lobby_id.as_str()) {
+                lock.pending_join_lobby_id = None;
+            }
             lock.game_status = Some(GameStatus::Waiting);
         }
         "NewGame" => {
@@ -142,12 +169,12 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             if let Some(lobby_info) = &mut lock.lobby_info {
                 lobby_info.data = new_game.data;
             }
-            lock.player_info = Some(new_game.players_info)
+            lock.players_info = Some(new_game.players_info)
         }
         "EndGame" => {
-            let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
+            let player_info = parse_payload_json::<PlayersInfoSnapshot>(&words)?;
             let mut lock = shared_model.write().unwrap();
-            lock.player_info = Some(player_info);
+            lock.players_info = Some(player_info);
             lock.game_status = Some(GameStatus::End);
         }
         "Error" => {
@@ -159,10 +186,18 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             let mut lock = shared_model.write().unwrap();
             lock.user_id = Some(user_id);
         }
+        "LeaveGroup" => {
+            let did_succeed = parse_payload_json::<bool>(&words)?;
+
+            if !did_succeed {
+                return Err("Something went wrong leaving the group".to_string());
+            }
+
+            clear_shared_model(shared_model);
+        }
         "PlayersInfo" => {
-            let player_info = parse_payload_json::<PlayerInfoSnapshot>(&words)?;
-            let mut lock = shared_model.write().unwrap();
-            lock.player_info = Some(player_info);
+            let incoming_players = parse_payload_json::<PlayersInfoSnapshot>(&words)?;
+            update_players(shared_model, incoming_players);
         }
         "Countdown" => {
             let countdown = parse_payload_json::<i8>(&words)?;
@@ -170,7 +205,11 @@ fn parse_ws_msg(msg: &str, shared_model: Arc<RwLock<SharedModel>>) -> Result<(),
             let mut lock = shared_model.write().unwrap();
             lock.game_status = Some(GameStatus::Countdown(countdown));
         }
-        _ => {}
+        "StartGame" => {
+            let mut lock = shared_model.write().unwrap();
+            lock.game_status = Some(GameStatus::Playing);
+        }
+        _ => return Err(format!("cmd {} unsupported", cmd)),
     };
 
     Ok(())
@@ -197,9 +236,46 @@ fn parse_payload_json<T: for<'a> Deserialize<'a>>(words: &[&str]) -> Result<T, S
     serde_json::from_str::<T>(&payload).map_err(|err| err.to_string())
 }
 
+/// clear the game state when leaving
+fn clear_shared_model(shared_model: Arc<RwLock<SharedModel>>) {
+    let mut lock = shared_model.write().unwrap();
+
+    lock.active_lobby_id = None;
+    lock.pending_join_lobby_id = None;
+    lock.players_info = None;
+    lock.lobby_info = None;
+    lock.game_status = None;
+}
+
+/// updates the players if it's new
+/// the incoming_playings will always be specific to the current group the user is in because the
+/// backend will not allow the user to join another group if the user is already in a group.
+fn update_players(shared_model: Arc<RwLock<SharedModel>>, incoming_players: PlayersInfoSnapshot) {
+    let mut lock = shared_model.write().unwrap();
+    let expected_lobby_id = lock
+        .active_lobby_id
+        .as_deref()
+        .or(lock.pending_join_lobby_id.as_deref());
+
+    if expected_lobby_id != Some(incoming_players.lobby_id.as_str()) {
+        return;
+    }
+
+    match &mut lock.players_info {
+        Some(players) => {
+            let is_newer_version = players.version < incoming_players.version;
+
+            if is_newer_version {
+                *players = incoming_players;
+            }
+        }
+        None => lock.players_info = Some(incoming_players),
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
+    use std::collections::{HashMap, VecDeque};
     use std::fmt::Display;
     use std::task::Poll;
     use std::time::Duration;
@@ -320,6 +396,197 @@ mod test {
         )
     }
 
+    #[test]
+    fn test_parse_ws_msg_leave_group_success_clears_lobby_state() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+
+        let lobby_info = LobbyInfo {
+            lobby_id: "lobby-1".to_string(),
+            data: Data {
+                text: "text".to_string(),
+                source: "source".to_string(),
+            },
+        };
+        let players_info = players_info_snapshot("lobby-1", 1, &["user-1"]);
+
+        assert_eq!(
+            parse_ws_msg("UserId user-1", Arc::clone(&shared_model)),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!("LobbyInfo {}", serde_json::to_string(&lobby_info).unwrap()),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&players_info).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg("Countdown 3", Arc::clone(&shared_model)),
+            Ok(())
+        );
+
+        assert_eq!(
+            parse_ws_msg("LeaveGroup true", Arc::clone(&shared_model)),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.user_id, Some("user-1".to_string()));
+        assert_eq!(lock.lobby_info, None);
+        assert_eq!(lock.players_info, None);
+        assert!(lock.game_status.is_none());
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_ignores_stale_snapshot_for_same_lobby() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("lobby-1".to_string());
+        }
+
+        let fresh_players = players_info_snapshot("lobby-1", 2, &["new-player"]);
+        let stale_players = players_info_snapshot("lobby-1", 1, &["old-player"]);
+
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&fresh_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&stale_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.players_info, Some(fresh_players));
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_is_accepted_before_lobby_info_if_join_is_pending() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("target-lobby".to_string());
+        }
+
+        let players_info = players_info_snapshot("target-lobby", 1, &["user-1"]);
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&players_info).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.players_info, Some(players_info));
+        assert_eq!(lock.pending_join_lobby_id, Some("target-lobby".to_string()));
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_is_rejected_for_wrong_lobby_when_join_is_pending() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("target-lobby".to_string());
+        }
+
+        let wrong_lobby_players = players_info_snapshot("other-lobby", 99, &["user-1"]);
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&wrong_lobby_players).unwrap()
+                ),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.players_info, None);
+    }
+
+    #[test]
+    fn test_parse_ws_msg_lobby_info_sets_active_lobby_and_clears_matching_pending_join() {
+        let shared_model: Arc<RwLock<SharedModel>> = Arc::new(RwLock::new(SharedModel::default()));
+        {
+            let mut lock = shared_model.write().unwrap();
+            lock.pending_join_lobby_id = Some("lobby-2".to_string());
+        }
+
+        let lobby_info = LobbyInfo {
+            lobby_id: "lobby-2".to_string(),
+            data: Data {
+                text: "text".to_string(),
+                source: "source".to_string(),
+            },
+        };
+
+        assert_eq!(
+            parse_ws_msg(
+                &format!("LobbyInfo {}", serde_json::to_string(&lobby_info).unwrap()),
+                Arc::clone(&shared_model)
+            ),
+            Ok(())
+        );
+
+        let lock = shared_model.read().unwrap();
+        assert_eq!(lock.active_lobby_id, Some("lobby-2".to_string()));
+        assert_eq!(lock.pending_join_lobby_id, None);
+    }
+
+    fn players_info_snapshot(
+        lobby_id: &str,
+        version: u64,
+        player_ids: &[&str],
+    ) -> PlayersInfoSnapshot {
+        let players = player_ids
+            .iter()
+            .map(|id| {
+                (
+                    (*id).to_string(),
+                    super::super::models::PlayerInfo {
+                        is_leader: *id == player_ids[0],
+                        wpm: 0.0,
+                        progress_percent: 0,
+                    },
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        PlayersInfoSnapshot {
+            lobby_id: lobby_id.to_string(),
+            version,
+            players,
+        }
+    }
+
     #[derive(Debug, PartialEq, PartialOrd)]
     struct MockError {
         err: String,
@@ -376,7 +643,6 @@ mod test {
             self: std::pin::Pin<&mut Self>,
             _cx: &mut std::task::Context<'_>,
         ) -> Poll<Result<(), Self::Error>> {
-            self.get_mut().messages.clear();
             Poll::Ready(Ok(()))
         }
         fn poll_close(

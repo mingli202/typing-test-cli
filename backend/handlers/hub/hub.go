@@ -33,11 +33,18 @@ func newHub(dataProvider *data_provider.DataProvider) Hub {
 }
 
 // Makes a new group and adds the given user to it
+// If the user is already in a group, delete the newly created group
 // Returns the lobbyInfo on success
 func (hub *Hub) handleNewGroup(u *user.User) (models.LobbyInfo, error) {
 	group := hub.newGroup()
 
 	lobbyInfo, err := hub.handleJoin(group.Id(), u)
+
+	if err != nil {
+		hub.mu.Lock()
+		delete(hub.groups, group.Id())
+		hub.mu.Unlock()
+	}
 
 	return lobbyInfo, err
 }
@@ -55,7 +62,7 @@ func (hub *Hub) handleLeave(u *user.User) error {
 }
 
 // Appends the given conn to the group with the given id
-// If the user is already in a group, they will be removed from it
+// If the user is already in a group, return an error
 // If successful, notify group that a new user has joined
 // Return the lobbyInfo on succesful join
 func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, error) {
@@ -63,26 +70,15 @@ func (hub *Hub) handleJoin(groupId string, u *user.User) (models.LobbyInfo, erro
 	defer hub.mu.Unlock()
 
 	oldGroupId := u.GroupId
-	isJoiningSameGroup := oldGroupId != nil && *oldGroupId == groupId
 
-	// asserts the joining group is not the same as the one already present
-	if isJoiningSameGroup {
-		return models.LobbyInfo{}, fmt.Errorf("How can you join the same group?")
+	if oldGroupId != nil {
+		return models.LobbyInfo{}, fmt.Errorf("Already in a group, leave the group before joining a new one!")
 	}
 
 	group, err := hub.canJoinGroupLocked(groupId, u)
 
 	if err != nil {
 		return models.LobbyInfo{}, err
-	}
-
-	// leaves old group knowing that it's a different group (if any)
-	// but only if the joining was successful
-	if oldGroupId != nil {
-		if oldGroup, _ := hub.leaveLocked(*oldGroupId, u); oldGroup != nil {
-			oldGroup.SendUpdatePlayers()
-		}
-
 	}
 
 	group.AddUser(u)
