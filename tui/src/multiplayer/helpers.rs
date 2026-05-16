@@ -20,22 +20,10 @@ pub async fn connect_to_ws(
     cancel_token: CancellationToken,
     event_tx: UnboundedSender<CustomEvent>,
     write_rx: UnboundedReceiver<String>,
-) {
-    let request = match "ws://localhost:8080/ws".into_client_request() {
-        Ok(res) => res,
-        Err(e) => {
-            let _ = toast::send(&event_tx, ToastMessage::error(e.to_string()));
-            return;
-        }
-    };
+) -> color_eyre::Result<()> {
+    let request = "ws://localhost:8080/ws".into_client_request()?;
 
-    let (stream, _) = match connect_async(request).await {
-        Ok(ok) => ok,
-        Err(e) => {
-            let _ = toast::send(&event_tx, ToastMessage::error(e.to_string()));
-            return;
-        }
-    };
+    let (stream, _) = connect_async(request).await?;
 
     let (write, read) = stream.split();
 
@@ -44,6 +32,8 @@ pub async fn connect_to_ws(
     init_write_task(write, write_rx, cancel_token.clone());
     init_read_task(read, read_tx, cancel_token.clone());
     init_recv_msg_task(game_model, read_rx, event_tx, cancel_token.clone());
+
+    Ok(())
 }
 
 /// inits the task that will listen for messages to be sent to the websocket
@@ -667,6 +657,7 @@ mod test {
             cancel_token: CancellationToken::new(),
             game_model,
             write_tx,
+            input_lobby_id: vec![],
         };
 
         // Act
@@ -729,6 +720,7 @@ mod test {
             cancel_token: CancellationToken::new(),
             game_model: Arc::clone(&game_model),
             write_tx,
+            input_lobby_id: vec![],
         };
 
         let lobby_info = LobbyInfo {
