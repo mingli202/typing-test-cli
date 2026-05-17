@@ -8,7 +8,7 @@ use ratatui::widgets::Widget;
 
 use crate::msg::Msg;
 use crate::typing;
-use crate::typing::typing_box::Typing;
+use crate::typing::Typing;
 use crate::util::view_helpers;
 
 use super::action::Action;
@@ -158,7 +158,7 @@ fn handle_arrow_keys(
 /// Main view function for typing test screen
 pub fn view(typing_model: &TypingModel, shared_model: &SharedModel, area: Rect, buf: &mut Buffer) {
     let typing_test_area = area.centered_vertically(Constraint::Length(3));
-    typing::typing_box::view_typing_test(&typing_model.typing, typing_test_area, buf);
+    typing::view_typing_test(&typing_model.typing, typing_test_area, buf);
 
     view_stats(
         &typing_model.stats,

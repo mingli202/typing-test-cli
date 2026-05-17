@@ -1,3 +1,5 @@
 mod letter;
-pub mod typing_box;
+mod typing_box;
 mod word;
+
+pub use typing_box::*;
