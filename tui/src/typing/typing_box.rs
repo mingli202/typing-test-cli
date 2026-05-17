@@ -36,6 +36,9 @@ pub struct Typing {
 
     /// Number of letters typed. Does not include untyped letters or extra letters
     n_letters_typed: usize,
+
+    /// whether the user must correct the current word to move to the next word
+    stop_on_error: bool,
 }
 
 impl Typing {
@@ -51,7 +54,14 @@ impl Typing {
             words,
             n_wrongs: 0,
             n_letters_typed: 0,
+            stop_on_error: false,
         }
+    }
+
+    /// builder function perchance
+    pub fn stop_on_error(mut self, stop_on_error: bool) -> Self {
+        self.stop_on_error = stop_on_error;
+        self
     }
 
     /// Processes the typed character. Returns whether the test is done.
