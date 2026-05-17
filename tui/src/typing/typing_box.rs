@@ -20,7 +20,7 @@ pub struct Typing {
     words: Vec<Word>,
 
     /// The current word the user is typing
-    pub(super) word_index: usize,
+    pub word_index: usize,
 
     /// The current letter in the current word to be typed
     letter_index: usize,

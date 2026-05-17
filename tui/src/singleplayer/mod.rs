@@ -6,11 +6,12 @@ use crate::msg::Msg;
 use crate::util::data_provider::{Data, DataProvider};
 
 use self::endscreen::EndScreenModel;
-use self::typing::TypingModel;
+use self::typing_screen::TypingModel;
 
 mod action;
 pub mod endscreen;
-pub mod typing;
+mod mode_selection;
+pub mod typing_screen;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Default, Debug)]
 pub enum Mode {
@@ -62,9 +63,10 @@ pub fn update(
     msg: Msg,
 ) -> Option<crate::action::Action> {
     let mut maybe_action = match &mut model.screen {
-        SinglePlayerScreen::Typing(typing_model) => typing::Msg::from(msg)
-            .and_then(|msg| typing::update(typing_model, &mut model.shared_model, msg)),
-        SinglePlayerScreen::End(_) => endscreen::Msg::from(msg).and_then(endscreen::update),
+        SinglePlayerScreen::Typing(typing_model) => {
+            typing_screen::update(typing_model, &mut model.shared_model, msg)
+        }
+        SinglePlayerScreen::End(_) => endscreen::update(msg),
     };
 
     while let Some(action) = maybe_action {
@@ -83,7 +85,7 @@ pub fn view(model: &SinglePlayerModel, area: Rect, buf: &mut Buffer) {
 
     match &model.screen {
         SinglePlayerScreen::Typing(typing_model) => {
-            typing::view(typing_model, &model.shared_model, centered, buf)
+            typing_screen::view(typing_model, &model.shared_model, centered, buf)
         }
         SinglePlayerScreen::End(endscreen_model) => {
             endscreen::view(endscreen_model, &model.shared_model, centered, buf)

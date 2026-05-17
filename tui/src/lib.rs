@@ -19,6 +19,7 @@ mod model;
 mod msg;
 mod multiplayer;
 mod singleplayer;
+pub mod typing;
 mod util;
 
 pub enum CustomEvent {

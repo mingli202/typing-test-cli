@@ -7,12 +7,10 @@ use ratatui::symbols::Marker;
 use ratatui::text::Line;
 use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Widget, Wrap};
 
+use crate::msg::Msg;
+
 use super::SharedModel;
 use super::action::Action;
-
-pub enum Msg {
-    Key(KeyCode),
-}
 
 pub struct EndScreenModel {
     final_wpm: f64,
@@ -29,12 +27,14 @@ impl EndScreenModel {
 }
 
 pub fn update(msg: Msg) -> Option<Action> {
-    let Msg::Key(key) = msg;
-    match key {
-        KeyCode::Char('q') | KeyCode::Esc => {
-            return Some(Action::Root(crate::action::Action::Quit));
-        }
-        KeyCode::Tab => return Some(Action::NewTypingScreen),
+    match msg {
+        Msg::Key(key) => match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                return Some(Action::Root(crate::action::Action::Quit));
+            }
+            KeyCode::Tab => return Some(Action::NewTypingScreen),
+            _ => {}
+        },
         _ => (),
     }
 

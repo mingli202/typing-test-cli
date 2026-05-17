@@ -3,28 +3,17 @@ use std::time::{Duration, Instant};
 use crossterm::event::KeyCode;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Offset, Rect};
-use ratatui::macros::{line, text};
-use ratatui::style::{Color, Stylize};
-use ratatui::text::Line;
+use ratatui::macros::line;
 use ratatui::widgets::Widget;
 
+use crate::msg::Msg;
+use crate::typing;
+use crate::typing::typing_box::Typing;
 use crate::util::view_helpers;
 
-use self::mode_selection::ModeSelection;
-use self::typing::Typing;
-
 use super::action::Action;
+use super::mode_selection::{self, ModeSelection};
 use super::{Mode, SharedModel};
-
-mod letter;
-mod mode_selection;
-pub mod typing;
-mod word;
-
-pub enum Msg {
-    Tick,
-    Key(KeyCode),
-}
 
 #[derive(Debug, Default)]
 pub struct TypingStats {
@@ -34,7 +23,7 @@ pub struct TypingStats {
 }
 
 pub struct TypingModel {
-    typing_test: Typing,
+    typing: Typing,
     stats_last_updated_time: Instant,
     stats: TypingStats,
     selected_mode: ModeSelection,
@@ -43,7 +32,7 @@ pub struct TypingModel {
 impl TypingModel {
     pub fn new(text: &str, initial_mode: Mode) -> Self {
         TypingModel {
-            typing_test: Typing::new(text),
+            typing: Typing::new(text),
             stats_last_updated_time: Instant::now(),
             stats: TypingStats::default(),
             selected_mode: ModeSelection::new(initial_mode),
@@ -57,14 +46,14 @@ pub fn update(
     msg: Msg,
 ) -> Option<Action> {
     let TypingModel {
-        typing_test,
+        typing: typing_test,
         stats_last_updated_time,
         stats,
         selected_mode,
     } = typing_model;
 
     match msg {
-        Msg::Key(key) => match key {
+        Msg::Key(key) => match key.code {
             KeyCode::Char(c) => {
                 typing_test.start();
 
@@ -90,7 +79,7 @@ pub fn update(
                 return Some(Action::NewTypingScreen);
             }
             KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
-                return handle_arrow_keys(selected_mode, shared_model, key);
+                return handle_arrow_keys(selected_mode, shared_model, key.code);
             }
             _ => {}
         },
@@ -128,6 +117,7 @@ pub fn update(
                 stats.elapsed = elapsed
             }
         }
+        _ => {}
     };
 
     None
@@ -168,12 +158,12 @@ fn handle_arrow_keys(
 /// Main view function for typing test screen
 pub fn view(typing_model: &TypingModel, shared_model: &SharedModel, area: Rect, buf: &mut Buffer) {
     let typing_test_area = area.centered_vertically(Constraint::Length(3));
-    typing::view_typing_test(&typing_model.typing_test, typing_test_area, buf);
+    typing::typing_box::view_typing_test(&typing_model.typing, typing_test_area, buf);
 
     view_stats(
         &typing_model.stats,
         &shared_model.mode,
-        typing_model.typing_test.n_words(),
+        typing_model.typing.n_words(),
         typing_test_area,
         buf,
     );
