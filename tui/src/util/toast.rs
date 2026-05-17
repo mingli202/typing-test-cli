@@ -32,7 +32,7 @@ impl ToastLevel {
             Self::Error => Style::new().red(),
             Self::Success => Style::new().green(),
         }
-        .bg(Color::Black)
+        .bg(Color::Reset)
     }
 }
 
@@ -150,7 +150,7 @@ pub fn view(toast: &Toast, area: Rect, buf: &mut Buffer) {
 
     for (message, _) in messages {
         let paragraph =
-            Paragraph::new(text![message.msg.clone()].fg(Color::White).bg(Color::Black))
+            Paragraph::new(text![message.msg.clone()].fg(Color::White).bg(Color::Reset))
                 .black()
                 .wrap(Wrap { trim: true })
                 .block(
