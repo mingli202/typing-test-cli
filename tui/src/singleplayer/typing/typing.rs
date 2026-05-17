@@ -11,7 +11,7 @@ use super::letter::{Letter, TypedState};
 use super::word::Word;
 
 /// Represents a single typing test
-pub struct TypingTest {
+pub struct Typing {
     /// All the words of the text to type
     ///
     ///  0        1        2       3     4      5       6        7
@@ -38,12 +38,12 @@ pub struct TypingTest {
     n_letters_typed: usize,
 }
 
-impl TypingTest {
+impl Typing {
     /// Creates a new TypingTest with the given &str
     pub fn new(text: &str) -> Self {
         let words: Vec<Word> = text.split(" ").map(Word::new).collect();
 
-        TypingTest {
+        Typing {
             word_index: 0,
             letter_index: 0,
             time_started: None,
@@ -299,7 +299,7 @@ impl TypingTest {
     }
 }
 
-impl Display for TypingTest {
+impl Display for Typing {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -310,7 +310,7 @@ impl Display for TypingTest {
 }
 
 /// Returns text representation and cursorline index
-fn split_into_lines(typing_test: &TypingTest, max_width: usize) -> (Text<'_>, usize) {
+fn split_into_lines(typing_test: &Typing, max_width: usize) -> (Text<'_>, usize) {
     let mut lines: Vec<Line> = vec![];
     let mut current_line: Line = line![];
     let mut cursor_index = 0;
@@ -358,7 +358,7 @@ fn split_into_lines(typing_test: &TypingTest, max_width: usize) -> (Text<'_>, us
 }
 
 pub fn view_typing_test(
-    typing_test: &TypingTest,
+    typing_test: &Typing,
     area: ratatui::prelude::Rect,
     buf: &mut ratatui::prelude::Buffer,
 ) {
@@ -380,14 +380,14 @@ mod typing_test_test {
 
     #[test]
     fn typing_test_constructor() {
-        let test = TypingTest::new("Hello world!");
+        let test = Typing::new("Hello world!");
 
         assert_eq!(test.words.len(), 2)
     }
 
     #[test]
     fn on_space_middle_of_word() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
         test.letter_index = 2;
 
         let did_end = test.on_space();
@@ -408,7 +408,7 @@ mod typing_test_test {
 
     #[test]
     fn on_space_end_of_word() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hello".chars().for_each(|c| {
             test.on_type(c);
@@ -423,7 +423,7 @@ mod typing_test_test {
 
     #[test]
     fn on_space_last_word() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
         test.word_index = 1;
         test.letter_index = 4;
 
@@ -437,7 +437,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_single_char() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
         let did_end = test.on_type('H');
 
         assert_eq!(did_end, false, "should not have ended");
@@ -446,7 +446,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_one_word() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         let did_end = "Hello".chars().any(|c| test.on_type(c));
 
@@ -456,7 +456,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_with_space_in_middle() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hel".chars().any(|c| test.on_type(c));
         let did_end = test.on_type(' ');
@@ -467,7 +467,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_with_word_overshoot() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hellow".chars().any(|c| test.on_type(c));
         let did_end = test.on_type('o');
@@ -479,7 +479,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_all() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hello world".chars().any(|c| test.on_type(c));
         let did_end = test.on_type('!');
@@ -494,7 +494,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_all_and_last_word_error() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hello worlk".chars().any(|c| test.on_type(c));
         let did_end = test.on_type('!');
@@ -506,7 +506,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_all_and_last_word_overflow() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hello worlkkkk".chars().any(|c| test.on_type(c));
         let did_end = test.on_type('!');
@@ -518,7 +518,7 @@ mod typing_test_test {
 
     #[test]
     fn on_type_all_and_last_word_error_but_space() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hello worlk!".chars().any(|c| test.on_type(c));
         let did_end = test.on_type(' ');
@@ -530,7 +530,7 @@ mod typing_test_test {
 
     #[test]
     fn on_backspace_at_start() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         test.on_backspace();
 
@@ -539,7 +539,7 @@ mod typing_test_test {
 
     #[test]
     fn on_backspace_at_middle_of_word() {
-        let mut test = TypingTest::new("abcde fghi");
+        let mut test = Typing::new("abcde fghi");
 
         "wers".chars().any(|c| test.on_type(c));
         test.on_backspace();
@@ -564,7 +564,7 @@ mod typing_test_test {
 
     #[test]
     fn on_backspace_after_overshoot() {
-        let mut test = TypingTest::new("abcde fghi");
+        let mut test = Typing::new("abcde fghi");
 
         "abcdefgi".chars().any(|c| test.on_type(c));
         test.on_backspace();
@@ -591,7 +591,7 @@ mod typing_test_test {
 
     #[test]
     fn on_backspace_after_space_at_middle_of_word() {
-        let mut test = TypingTest::new("abcde fghi");
+        let mut test = Typing::new("abcde fghi");
 
         "wer".chars().any(|c| test.on_type(c));
         test.on_space();
@@ -602,7 +602,7 @@ mod typing_test_test {
 
     #[test]
     fn on_backspace_after_complete_word() {
-        let mut test = TypingTest::new("abcde fghi");
+        let mut test = Typing::new("abcde fghi");
 
         "abcde ".chars().any(|c| test.on_type(c));
         test.on_backspace();
@@ -613,7 +613,7 @@ mod typing_test_test {
 
     #[test]
     fn n_wrongs() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hel world!".chars().for_each(|c| {
             test.on_type(c);
@@ -624,7 +624,7 @@ mod typing_test_test {
 
     #[test]
     fn n_wrongs2() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hel worlddd ".chars().for_each(|c| {
             test.on_type(c);
@@ -635,7 +635,7 @@ mod typing_test_test {
 
     #[test]
     fn n_wrongs_with_backspace() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hel ".chars().for_each(|c| {
             test.on_type(c);
@@ -656,7 +656,7 @@ mod typing_test_test {
 
     #[test]
     fn n_wrongs_with_backspace2() {
-        let mut test = TypingTest::new("Hello world! this is peak");
+        let mut test = Typing::new("Hello world! this is peak");
 
         "Hel world! thasdf is ewa".chars().for_each(|c| {
             test.on_type(c);
@@ -683,7 +683,7 @@ mod typing_test_test {
 
     #[test]
     fn total_letters_typed() {
-        let mut test = TypingTest::new("Hello world!");
+        let mut test = Typing::new("Hello world!");
 
         "Hel waold!asdf".chars().for_each(|c| {
             test.on_type(c);
@@ -694,7 +694,7 @@ mod typing_test_test {
 
     #[test]
     fn simulate_usage() {
-        let mut test = TypingTest::new("Hello World!");
+        let mut test = Typing::new("Hello World!");
         test.on_type('h');
         test.on_type('e');
         test.on_type('l');
@@ -771,7 +771,7 @@ mod typing_test_test {
 
     #[test]
     fn elapsed_using_start() {
-        let mut test = TypingTest::new("Hello World!");
+        let mut test = Typing::new("Hello World!");
 
         assert_eq!(test.elapsed_since_start_sec(), None);
 
@@ -785,7 +785,7 @@ mod typing_test_test {
 
     #[test]
     fn elapsed_setting_start() {
-        let mut test = TypingTest::new("Hello World!");
+        let mut test = Typing::new("Hello World!");
 
         assert_eq!(test.elapsed_since_start_sec(), None);
 
@@ -799,7 +799,7 @@ mod typing_test_test {
 
     #[test]
     fn letters_typed() {
-        let mut test = TypingTest::new("Hello World!");
+        let mut test = Typing::new("Hello World!");
 
         "Hel Worlasdf".chars().for_each(|c| {
             test.on_type(c);
@@ -814,7 +814,7 @@ mod typing_test_test {
 
     #[test]
     fn letters_typed_and_backspace() {
-        let mut test = TypingTest::new("Hello World!");
+        let mut test = Typing::new("Hello World!");
 
         "Hel Worlasdf".chars().for_each(|c| {
             test.on_type(c);
@@ -852,7 +852,7 @@ mod typing_test_test {
 
     #[test]
     fn letters_typed_and_backspace_2() {
-        let mut test = TypingTest::new("Hello World!");
+        let mut test = Typing::new("Hello World!");
 
         "Hello ".chars().for_each(|c| {
             test.on_type(c);

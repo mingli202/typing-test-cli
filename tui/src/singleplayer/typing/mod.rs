@@ -11,7 +11,7 @@ use ratatui::widgets::Widget;
 use crate::util::view_helpers;
 
 use self::mode_selection::ModeSelection;
-use self::typing::TypingTest;
+use self::typing::Typing;
 
 use super::action::Action;
 use super::{Mode, SharedModel};
@@ -34,7 +34,7 @@ pub struct TypingStats {
 }
 
 pub struct TypingModel {
-    typing_test: TypingTest,
+    typing_test: Typing,
     stats_last_updated_time: Instant,
     stats: TypingStats,
     selected_mode: ModeSelection,
@@ -43,7 +43,7 @@ pub struct TypingModel {
 impl TypingModel {
     pub fn new(text: &str, initial_mode: Mode) -> Self {
         TypingModel {
-            typing_test: TypingTest::new(text),
+            typing_test: Typing::new(text),
             stats_last_updated_time: Instant::now(),
             stats: TypingStats::default(),
             selected_mode: ModeSelection::new(initial_mode),
