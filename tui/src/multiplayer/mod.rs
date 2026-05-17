@@ -4,10 +4,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect};
-use ratatui::macros::{line, span};
+use ratatui::macros::{line, span, text};
 use ratatui::style::{Color, Stylize};
 use ratatui::text::ToSpan;
-use ratatui::widgets::{Block, Paragraph, Widget};
+use ratatui::widgets::{Block, Paragraph, Widget, Wrap};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
@@ -16,10 +16,10 @@ use crate::msg::Msg;
 use crate::util::toast::ToastMessage;
 use crate::util::{toast, view_helpers};
 
-use self::helpers::connect_to_ws;
+use self::connect_helpers::connect_to_ws;
 use self::models::{LobbyInfo, PlayersInfoSnapshot, WsMsg};
 
-mod helpers;
+mod connect_helpers;
 mod models;
 
 pub enum GameStatus {
@@ -176,7 +176,18 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                 });
             create_text.render(create_text_area, buf);
         }
-        Some(lobby_info) => {}
+        Some(lobby_info) => {
+            let lobby_line = line!("Id: ", span!(lobby_info.lobby_id));
+            let lobby_line_area =
+                area.centered_horizontally(Constraint::Length(lobby_line.width() as u16));
+            lobby_line.render(lobby_line_area, buf);
+
+            let data_text = text!(lobby_info.data.text.clone());
+            let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
+            Paragraph::new(data_text)
+                .wrap(Wrap { trim: true })
+                .render(data_area, buf);
+        }
     };
 
     view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Quit <Esc>"], area, buf);
