@@ -882,4 +882,40 @@ mod typing_test_test {
             "should not count untyped letters or extra letters"
         );
     }
+
+    #[test]
+    fn test_stop_on_error() {
+        let mut test = Typing::new("Hello world!");
+
+        "Hel wor".chars().for_each(|c| {
+            test.on_type(c);
+        });
+
+        let letters = test
+            .words
+            .iter()
+            .flat_map(|word| {
+                word.letters.iter().filter_map(|letter| {
+                    if let TypedState::NotTyped = letter.typed_state {
+                        None
+                    } else {
+                        Some(letter.typed_state)
+                    }
+                })
+            })
+            .collect::<Vec<TypedState>>();
+
+        assert_eq!(
+            letters,
+            vec![
+                TypedState::Typed('H'),
+                TypedState::Typed('e'),
+                TypedState::Typed('l'),
+                TypedState::Typed('_'),
+                TypedState::Typed('W'),
+                TypedState::Extra,
+                TypedState::Extra
+            ],
+        )
+    }
 }
