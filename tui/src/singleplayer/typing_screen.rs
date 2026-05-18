@@ -201,10 +201,7 @@ fn view_stats(
 /// Render some instructions
 fn view_bottom_menu_typing(area: Rect, buf: &mut Buffer) {
     view_helpers::view_bottom_menu(
-        &[
-            "Next <Tab>  Quit <Esc>  PVP <C-p>",
-            "Select mode <Up/Down/Left/Right>",
-        ],
+        &["Next <Tab>  PVP <C-p>", "Select mode <Up/Down/Left/Right>"],
         area,
         buf,
     );

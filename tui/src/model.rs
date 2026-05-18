@@ -56,16 +56,11 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
         Msg::ToastAction(action) => model.toast.handle_action(action),
         _ => {
             match msg {
-                Msg::Key(
-                    KeyEvent {
-                        code: KeyCode::Esc, ..
-                    }
-                    | KeyEvent {
-                        code: KeyCode::Char('c'),
-                        modifiers: KeyModifiers::CONTROL,
-                        ..
-                    },
-                ) => {
+                Msg::Key(KeyEvent {
+                    code: KeyCode::Char('c'),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                }) => {
                     return Some(Action::Quit);
                 }
                 Msg::Key(KeyEvent {

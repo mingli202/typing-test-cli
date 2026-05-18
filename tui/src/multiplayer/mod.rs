@@ -4,10 +4,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect};
-use ratatui::macros::{line, span, text};
+use ratatui::macros::{line, span};
 use ratatui::style::{Color, Stylize};
 use ratatui::text::ToSpan;
-use ratatui::widgets::{Block, Paragraph, Widget, Wrap};
+use ratatui::widgets::{Block, Paragraph, Widget};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
@@ -193,5 +193,5 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
         }
     };
 
-    view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Quit <Esc>"], area, buf);
+    view_helpers::view_bottom_menu(&["Singleplayer <C-p>"], area, buf);
 }

@@ -27,15 +27,14 @@ impl EndScreenModel {
 }
 
 pub fn update(msg: Msg) -> Option<Action> {
-    match msg {
-        Msg::Key(key) => match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => {
+    if let Msg::Key(key) = msg {
+        match key.code {
+            KeyCode::Char('q') => {
                 return Some(Action::Root(crate::action::Action::Quit));
             }
             KeyCode::Tab => return Some(Action::NewTypingScreen),
             _ => {}
-        },
-        _ => (),
+        }
     }
 
     None
@@ -71,7 +70,7 @@ pub fn view(model: &EndScreenModel, shared_model: &SharedModel, area: Rect, buf:
 
 /// Renders the menu of keybinds at the bottom
 fn render_bottom_menu_end_screen(area: Rect, buf: &mut Buffer) {
-    let line = Line::raw("Next <Tab>  Quit <Esc/q>").fg(Color::DarkGray);
+    let line = Line::raw("Next <Tab>  Quit <q>").fg(Color::DarkGray);
     let mut menu_area = area.centered_horizontally(Constraint::Length(line.width() as u16));
     menu_area.y = area.bottom() - 2;
 
