@@ -9,7 +9,7 @@ use ratatui::macros::{line, span};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::symbols;
 use ratatui::text::ToSpan;
-use ratatui::widgets::{Block, LineGauge, Paragraph, Widget};
+use ratatui::widgets::{Block, LineGauge, Paragraph, Widget, Wrap};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
@@ -314,22 +314,13 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             lobby_line.render(lobby_line_area, buf);
 
             let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
-            let status_area = data_area
-                .resize(Size {
-                    width: data_area.width,
-                    height: 1,
-                })
-                .offset(Offset { x: 0, y: -2 });
-
-            let max_offset = status_area.y.saturating_sub(1);
+            let mut status_area = data_area.offset(Offset { x: 0, y: -2 });
 
             let mut is_leader = false;
 
             if let Some(ref players) = lock.players_info
                 && let Some(ref user_id) = lock.user_id
             {
-                view_players(players, user_id, max_offset, area, buf);
-
                 is_leader = players
                     .players
                     .get(user_id)
@@ -337,7 +328,14 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             }
 
             if let Some(ref game_status) = lock.game_status {
-                view_game_status(game_status, is_leader, status_area, buf);
+                status_area = view_game_status(game_status, is_leader, status_area, buf);
+            }
+
+            let max_offset = status_area.y.saturating_sub(1);
+            if let Some(ref players) = lock.players_info
+                && let Some(ref user_id) = lock.user_id
+            {
+                view_players(players, user_id, max_offset, area, buf);
             }
 
             view_typing_test(&lobby.typing, data_area, buf);
@@ -348,7 +346,12 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
 }
 
 /// Show the game status
-fn view_game_status(game_status: &GameStatus, is_leader: bool, area: Rect, buf: &mut Buffer) {
+fn view_game_status(
+    game_status: &GameStatus,
+    is_leader: bool,
+    area: Rect,
+    buf: &mut Buffer,
+) -> Rect {
     let txt = match game_status {
         GameStatus::Waiting => {
             if is_leader {
@@ -372,8 +375,17 @@ fn view_game_status(game_status: &GameStatus, is_leader: bool, area: Rect, buf: 
         }
     };
 
-    let centered = area.centered_horizontally(Constraint::Length(txt.width() as u16));
-    txt.render(centered, buf);
+    let p = Paragraph::new(txt).wrap(Wrap { trim: true }).centered();
+    let n_line = p.line_count(area.width);
+
+    let area = area.offset(Offset {
+        x: 0,
+        y: -(n_line as i32 - 1),
+    });
+
+    p.render(area, buf);
+
+    area
 }
 
 /// renders the players
