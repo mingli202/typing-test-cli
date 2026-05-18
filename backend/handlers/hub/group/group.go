@@ -265,12 +265,12 @@ func (group *Group) countDown() {
 	countdown := 10
 
 	for _ = range ticker {
-		group.broadcast(models.CountdownMessage{Countdown: countdown})
-		countdown -= 1
-
 		if countdown == 0 {
 			return
 		}
+
+		group.broadcast(models.CountdownMessage{Countdown: countdown})
+		countdown -= 1
 	}
 }
 
