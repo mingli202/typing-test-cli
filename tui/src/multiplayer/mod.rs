@@ -23,6 +23,7 @@ use self::models::{LobbyInfo, PlayersInfoSnapshot, WsMsg};
 mod connect_helpers;
 mod models;
 
+#[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
 pub enum GameStatus {
     Waiting,
     Countdown(i8),
@@ -105,7 +106,7 @@ pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::A
     };
 
     if is_in_lobby {
-        None
+        update_lobby_info(model, msg)
     } else {
         update_no_lobby_info(model, msg)
     }
@@ -205,6 +206,48 @@ fn update_no_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate:
                 _ => {}
             };
         }
+        Msg::Tick => {}
+        _ => {}
+    };
+
+    None
+}
+
+/// the update part of the view with a lobby
+fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
+    match msg {
+        Msg::Key(key) => match key.code {
+            KeyCode::Char(c) => {
+                let is_playing = {
+                    let lock = model.game_model.read().unwrap();
+                    lock.game_status == Some(GameStatus::Playing)
+                };
+
+                if is_playing {
+                    let mut lock = model.game_model.write().unwrap();
+                    if let Some(lobby) = &mut lock.lobby {
+                        lobby.typing.on_type(c);
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                model.send_msg(WsMsg::LeaveGroup);
+            }
+            KeyCode::Backspace => {
+                let is_playing = {
+                    let lock = model.game_model.read().unwrap();
+                    lock.game_status == Some(GameStatus::Playing)
+                };
+
+                if is_playing {
+                    let mut lock = model.game_model.write().unwrap();
+                    if let Some(lobby) = &mut lock.lobby {
+                        lobby.typing.on_backspace();
+                    }
+                }
+            }
+            _ => {}
+        },
         Msg::Tick => {}
         _ => {}
     };
