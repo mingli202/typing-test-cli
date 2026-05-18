@@ -21,7 +21,7 @@ use crate::util::toast::ToastMessage;
 use crate::util::{toast, view_helpers};
 
 use self::connect_helpers::connect_to_ws;
-use self::models::{LobbyInfo, PlayersInfoSnapshot, WsMsg};
+use self::models::{LobbyInfo, PlayerInfo, PlayersInfoSnapshot, WsMsg};
 
 mod connect_helpers;
 mod models;
@@ -214,7 +214,10 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                     if let Some(ref players) = lock.players_info
                         && let Some(ref user_id) = lock.user_id
                     {
-                        is_leader = players.players.contains_key(user_id);
+                        is_leader = players
+                            .players
+                            .get(user_id)
+                            .is_some_and(|player| player.is_leader);
                     }
 
                     is_leader
@@ -319,7 +322,7 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                 })
                 .offset(Offset { x: 0, y: -2 });
 
-            let max_offset = status_area.y - 1;
+            let max_offset = status_area.y.saturating_sub(1);
 
             let mut is_leader = false;
 
@@ -328,7 +331,10 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             {
                 view_players(players, user_id, max_offset, area, buf);
 
-                is_leader = players.players.contains_key(user_id);
+                is_leader = players
+                    .players
+                    .get(user_id)
+                    .is_some_and(|player| player.is_leader);
             }
 
             if let Some(ref game_status) = lock.game_status {
@@ -369,7 +375,7 @@ fn view_game_status(game_status: &GameStatus, is_leader: bool, area: Rect, buf: 
 
 /// renders the players
 fn view_players(
-    players: &PlayersInfoSnapshot,
+    players_info: &PlayersInfoSnapshot,
     me: &str,
     max_offset: u16,
     area: Rect,
@@ -379,21 +385,26 @@ fn view_players(
         .centered_horizontally(Constraint::Max(80))
         .offset(Offset { x: 0, y: 2 });
 
-    let area = area.resize(Size {
+    let mut area = area.resize(Size {
         width: area.width,
-        height: area.height / 2 - 6,
+        height: (area.height / 2).saturating_sub(6),
     });
 
-    let players = players
+    if area.height == 0 {
+        return;
+    }
+
+    let players = players_info
         .players
         .iter()
-        .sorted_by(|(id_a, player_a), (_, player_b)| {
-            if *id_a == me {
-                return Ordering::Less;
-            }
+        .filter(|(id, _)| *id != me)
+        .sorted_by_key(|(id, player)| (player.progress_percent, *id))
+        .rev();
 
-            Ord::cmp(&player_a.progress_percent, &player_b.progress_percent)
-        });
+    if let Some(me_info) = players_info.players.get(me) {
+        view_player(me, me_info, true, area, buf);
+        area.y += 1;
+    }
 
     for (i, (id, player)) in players.enumerate() {
         let area = area.offset(Offset { x: 0, y: i as i32 });
@@ -402,22 +413,26 @@ fn view_players(
             break;
         };
 
-        let ratio = player.progress_percent as f64 / 100.0;
-
-        let short_id = &id[..6];
-
-        let mut label = span!(format!("{} {}%", short_id, player.progress_percent));
-
-        if id == me {
-            label = label.underlined();
-        }
-
-        LineGauge::default()
-            .label(label)
-            .filled_style(Style::new().white())
-            .filled_symbol(symbols::line::THICK_HORIZONTAL)
-            .unfilled_symbol(" ")
-            .ratio(ratio.clamp(0.0, 1.0))
-            .render(area, buf)
+        view_player(id, player, false, area, buf);
     }
+}
+
+fn view_player(id: &str, player: &PlayerInfo, is_me: bool, area: Rect, buf: &mut Buffer) {
+    let ratio = player.progress_percent as f64 / 100.0;
+
+    let short_id = &id[..6];
+
+    let mut label = span!(format!("{} {}%", short_id, player.progress_percent));
+
+    if is_me {
+        label = label.underlined();
+    }
+
+    LineGauge::default()
+        .label(label)
+        .filled_style(Style::new().white())
+        .filled_symbol(symbols::line::THICK_HORIZONTAL)
+        .unfilled_symbol(" ")
+        .ratio(ratio.clamp(0.0, 1.0))
+        .render(area, buf)
 }
