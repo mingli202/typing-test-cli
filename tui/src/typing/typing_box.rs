@@ -79,18 +79,10 @@ impl Typing {
         let is_done = if c == ' ' {
             self.on_space()
         } else {
+            self.add_letter_to_current_word(c);
+
             let curr_word = &mut self.words[self.word_index];
             let word_len = curr_word.letters_len();
-
-            let is_overshoot = self.letter_index >= word_len;
-            if is_overshoot {
-                curr_word.push(Letter::new(c).with_typed_letter(TypedState::Extra));
-            } else {
-                let curr_letter = curr_word.get_letter_mut(self.letter_index).unwrap();
-                curr_letter.typed_state = TypedState::Typed(c);
-
-                self.n_letters_typed += 1;
-            }
 
             let is_last_word_error = curr_word.is_error();
             let is_at_last_letter_of_last_word =
@@ -108,6 +100,23 @@ impl Typing {
         }
 
         is_done
+    }
+
+    /// adds the given letter ot the current word
+    /// handles overflow
+    fn add_letter_to_current_word(&mut self, c: char) {
+        let curr_word = &mut self.words[self.word_index];
+        let word_len = curr_word.letters_len();
+
+        let is_overshoot = self.letter_index >= word_len;
+        if is_overshoot {
+            curr_word.push(Letter::new(c).with_typed_state(TypedState::Extra));
+        } else {
+            let curr_letter = curr_word.get_letter_mut(self.letter_index).unwrap();
+            curr_letter.typed_state = TypedState::Typed(c);
+
+            self.n_letters_typed += 1;
+        }
     }
 
     /// Gets the numbers of wrong words up to the current word the user is typing
@@ -247,19 +256,25 @@ impl Typing {
         let curr_word = &mut self.words[self.word_index];
         curr_word.last_typed_letter_index = self.letter_index;
 
-        if curr_word.is_error() {
+        let is_curr_word_error = curr_word.is_error();
+        if is_curr_word_error {
             self.n_wrongs += 1;
         }
 
         let is_last_word = self.word_index >= len - 1;
 
-        if is_last_word {
+        if is_last_word && !(self.stop_on_error && is_curr_word_error) {
             return true;
         }
 
-        self.word_index += 1;
-        self.letter_index = 0;
-        self.n_letters_typed += 1;
+        if is_curr_word_error && self.stop_on_error {
+            self.add_letter_to_current_word('_');
+            self.letter_index += 1;
+        } else {
+            self.word_index += 1;
+            self.letter_index = 0;
+            self.n_letters_typed += 1;
+        }
 
         false
     }
@@ -560,7 +575,7 @@ mod typing_test_test {
                 .unwrap()
                 .letters
                 .iter()
-                .map(|letter| letter.typed_state.clone())
+                .map(|letter| letter.typed_state)
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('w'),
@@ -585,7 +600,7 @@ mod typing_test_test {
                 .unwrap()
                 .letters
                 .iter()
-                .map(|letter| letter.typed_state.clone())
+                .map(|letter| letter.typed_state)
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('a'),
@@ -743,7 +758,7 @@ mod typing_test_test {
             test.words[1]
                 .letters
                 .iter()
-                .map(|letter| letter.typed_state.clone())
+                .map(|letter| letter.typed_state)
                 .collect::<Vec<TypedState>>(),
             vec![
                 TypedState::Typed('W'),
@@ -885,24 +900,16 @@ mod typing_test_test {
 
     #[test]
     fn test_stop_on_error() {
-        let mut test = Typing::new("Hello world!");
+        let mut test = Typing::new("Hello World!").stop_on_error(true);
 
-        "Hel wor".chars().for_each(|c| {
+        "Hel Wor".chars().for_each(|c| {
             test.on_type(c);
         });
 
-        let letters = test
-            .words
+        let letters = test.words[0]
+            .letters
             .iter()
-            .flat_map(|word| {
-                word.letters.iter().filter_map(|letter| {
-                    if let TypedState::NotTyped = letter.typed_state {
-                        None
-                    } else {
-                        Some(letter.typed_state)
-                    }
-                })
-            })
+            .map(|letter| letter.typed_state)
             .collect::<Vec<TypedState>>();
 
         assert_eq!(
