@@ -43,11 +43,15 @@ pub struct SinglePlayerModel {
 }
 
 impl SinglePlayerModel {
-    pub fn new(data: Data, initial_mode: Mode) -> Self {
+    pub fn new(data: Data, initial_mode: Mode, no_error: bool) -> Self {
         let text = &data.text;
 
         SinglePlayerModel {
-            screen: SinglePlayerScreen::Typing(TypingModel::new(text, initial_mode.clone())),
+            screen: SinglePlayerScreen::Typing(TypingModel::new(
+                text,
+                initial_mode.clone(),
+                no_error,
+            )),
             shared_model: SharedModel {
                 mode: initial_mode,
                 history: vec![],
@@ -60,6 +64,7 @@ impl SinglePlayerModel {
 pub fn update(
     model: &mut SinglePlayerModel,
     data_provider: &DataProvider,
+    no_error: bool,
     msg: Msg,
 ) -> Option<crate::action::Action> {
     let mut maybe_action = match &mut model.screen {
@@ -74,7 +79,7 @@ pub fn update(
             return Some(root_action);
         }
 
-        maybe_action = handle_action(model, data_provider, action)
+        maybe_action = handle_action(model, data_provider, no_error, action)
     }
 
     None
@@ -96,13 +101,19 @@ pub fn view(model: &SinglePlayerModel, area: Rect, buf: &mut Buffer) {
 pub fn handle_action(
     model: &mut SinglePlayerModel,
     data_provider: &DataProvider,
+    no_error: bool,
     action: action::Action,
 ) -> Option<action::Action> {
     match action {
         action::Action::ModeChange(mode) => {
             model.shared_model.mode = mode.clone();
 
-            let _ = handle_action(model, data_provider, action::Action::NewTypingScreen);
+            let _ = handle_action(
+                model,
+                data_provider,
+                no_error,
+                action::Action::NewTypingScreen,
+            );
 
             return Some(action::Action::Root(
                 crate::action::Action::ConfigModeUpdate(mode),
@@ -115,7 +126,7 @@ pub fn handle_action(
 
             let mode = model.shared_model.mode.clone();
 
-            model.screen = SinglePlayerScreen::Typing(TypingModel::new(text, mode));
+            model.screen = SinglePlayerScreen::Typing(TypingModel::new(text, mode, no_error));
         }
         action::Action::NewEndScreen {
             final_wpm,

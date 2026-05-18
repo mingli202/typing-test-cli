@@ -34,7 +34,7 @@ pub async fn run(terminal: &mut DefaultTerminal, args: Args) -> color_eyre::Resu
     let (event_tx, mut event_rx) = mpsc::unbounded_channel();
     init_event_loop(event_tx.clone(), args.fps, args.tps);
 
-    let mut app_model = AppModel::new(event_tx, args.words_path, args.quotes_path).await?;
+    let mut app_model = AppModel::new(event_tx, args).await?;
 
     while !app_model.exit {
         let mut maybe_action: Option<Action> = tokio::select! {

@@ -3,6 +3,7 @@ use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::action::Action;
+use crate::args::Args;
 pub use crate::msg::Msg;
 use crate::multiplayer::{self, MultiplayerModel};
 use crate::singleplayer::SinglePlayerModel;
@@ -20,6 +21,7 @@ pub struct AppModel {
     pub exit: bool,
     toast: Toast,
     config: Config,
+    args: Args,
     screen: Screen,
     data_provider: DataProvider,
     event_tx: UnboundedSender<CustomEvent>,
@@ -28,23 +30,23 @@ pub struct AppModel {
 impl AppModel {
     pub async fn new(
         event_tx: UnboundedSender<CustomEvent>,
-        words_path: Option<String>,
-        quotes_path: Option<String>,
+        args: Args,
     ) -> color_eyre::Result<Self> {
         let config = Config::new(event_tx.clone()).await;
         let toast = Toast::new(event_tx.clone());
-        let data_provider = DataProvider::new(words_path, quotes_path)?;
+        let data_provider = DataProvider::new(&args.words_path, &args.quotes_path)?;
 
         let initial_mode = config.data.mode.clone();
         let data = data_provider.get_data_from_mode(&initial_mode);
 
         Ok(AppModel {
             exit: false,
-            screen: Screen::SinglePlayer(SinglePlayerModel::new(data, initial_mode)),
+            screen: Screen::SinglePlayer(SinglePlayerModel::new(data, initial_mode, args.no_error)),
             toast,
             config,
             data_provider,
             event_tx,
+            args,
         })
     }
 }
@@ -79,7 +81,7 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
                         let initial_mode = model.config.data.mode.clone();
                         let data = model.data_provider.get_data_from_mode(&initial_mode);
                         return Some(Action::SwitchScreen(Screen::SinglePlayer(
-                            SinglePlayerModel::new(data, initial_mode),
+                            SinglePlayerModel::new(data, initial_mode, model.args.no_error),
                         )));
                     }
                 }
@@ -87,9 +89,12 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
             }
 
             return match &mut model.screen {
-                Screen::SinglePlayer(singleplayer_model) => {
-                    singleplayer::update(singleplayer_model, &model.data_provider, msg)
-                }
+                Screen::SinglePlayer(singleplayer_model) => singleplayer::update(
+                    singleplayer_model,
+                    &model.data_provider,
+                    model.args.no_error,
+                    msg,
+                ),
                 Screen::Multiplayer(multiplayer_model) => {
                     multiplayer::update(multiplayer_model, msg)
                 }

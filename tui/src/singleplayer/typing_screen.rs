@@ -30,9 +30,9 @@ pub struct TypingModel {
 }
 
 impl TypingModel {
-    pub fn new(text: &str, initial_mode: Mode) -> Self {
+    pub fn new(text: &str, initial_mode: Mode, no_error: bool) -> Self {
         TypingModel {
-            typing: Typing::new(text),
+            typing: Typing::new(text).stop_on_error(no_error),
             stats_last_updated_time: Instant::now(),
             stats: TypingStats::default(),
             selected_mode: ModeSelection::new(initial_mode),
