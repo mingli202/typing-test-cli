@@ -152,10 +152,17 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
                 lobby_info,
             });
             lock.active_lobby_id = Some(lobby_id.clone());
-            if lock.pending_join_lobby_id.as_deref() == Some(lobby_id.as_str()) {
-                lock.pending_join_lobby_id = None;
-            }
             lock.game_status = Some(GameStatus::Waiting);
+
+            if lock.pending_lobby.lobby_id.as_deref() == Some(lobby_id.as_str()) {
+                lock.pending_lobby.lobby_id = None;
+            }
+
+            if let Some(pending_players) = lock.pending_lobby.pending_players.take()
+                && pending_players.lobby_id == lobby_id
+            {
+                lock.players_info = Some(pending_players);
+            }
         }
         "NewGame" => {
             let new_game = parse_payload_json::<NewGame>(&words)?;
@@ -236,7 +243,8 @@ fn clear_game_model(game_model: Arc<RwLock<GameModel>>) {
     let mut lock = game_model.write().unwrap();
 
     lock.active_lobby_id = None;
-    lock.pending_join_lobby_id = None;
+    lock.pending_lobby.lobby_id = None;
+    lock.pending_lobby.pending_players = None;
     lock.players_info = None;
     lock.lobby = None;
     lock.game_status = None;
@@ -250,9 +258,10 @@ fn update_players(game_model: Arc<RwLock<GameModel>>, incoming_players: PlayersI
     let expected_lobby_id = lock
         .active_lobby_id
         .as_deref()
-        .or(lock.pending_join_lobby_id.as_deref());
+        .or(lock.pending_lobby.lobby_id.as_deref());
 
     if expected_lobby_id != Some(incoming_players.lobby_id.as_str()) {
+        lock.pending_lobby.pending_players = Some(incoming_players);
         return;
     }
 
@@ -450,7 +459,7 @@ mod test {
         let game_model: Arc<RwLock<GameModel>> = Arc::new(RwLock::new(GameModel::default()));
         {
             let mut lock = game_model.write().unwrap();
-            lock.pending_join_lobby_id = Some("lobby-1".to_string());
+            lock.pending_lobby.lobby_id = Some("lobby-1".to_string());
         }
 
         let fresh_players = players_info_snapshot("lobby-1", 2, &["new-player"]);
@@ -486,7 +495,7 @@ mod test {
         let game_model: Arc<RwLock<GameModel>> = Arc::new(RwLock::new(GameModel::default()));
         {
             let mut lock = game_model.write().unwrap();
-            lock.pending_join_lobby_id = Some("target-lobby".to_string());
+            lock.pending_lobby.lobby_id = Some("target-lobby".to_string());
         }
 
         let players_info = players_info_snapshot("target-lobby", 1, &["user-1"]);
@@ -503,7 +512,51 @@ mod test {
 
         let lock = game_model.read().unwrap();
         assert_eq!(lock.players_info, Some(players_info));
-        assert_eq!(lock.pending_join_lobby_id, Some("target-lobby".to_string()));
+        assert_eq!(
+            lock.pending_lobby.lobby_id,
+            Some("target-lobby".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_ws_msg_players_info_is_updated_after_making_new_lobby_and_joining() {
+        let game_model: Arc<RwLock<GameModel>> = Arc::new(RwLock::new(GameModel::default()));
+
+        let players_info = players_info_snapshot("target-lobby", 1, &["user-1"]);
+        assert_eq!(
+            parse_ws_msg(
+                &format!(
+                    "PlayersInfo {}",
+                    serde_json::to_string(&players_info).unwrap()
+                ),
+                Arc::clone(&game_model)
+            ),
+            Ok(())
+        );
+
+        let lobby_info = LobbyInfo {
+            data: Data {
+                text: "some text".to_string(),
+                source: "some source".to_string(),
+            },
+            lobby_id: "target-lobby".to_string(),
+        };
+
+        assert_eq!(
+            parse_ws_msg(
+                &format!("LobbyInfo {}", serde_json::to_string(&lobby_info).unwrap()),
+                Arc::clone(&game_model)
+            ),
+            Ok(())
+        );
+
+        let lock = game_model.read().unwrap();
+        assert_eq!(lock.players_info, Some(players_info));
+        assert_eq!(
+            lock.lobby.as_ref().unwrap().lobby_info.lobby_id,
+            "target-lobby".to_string()
+        );
+        assert_eq!(lock.pending_lobby.pending_players, None);
     }
 
     #[test]
@@ -511,7 +564,7 @@ mod test {
         let game_model: Arc<RwLock<GameModel>> = Arc::new(RwLock::new(GameModel::default()));
         {
             let mut lock = game_model.write().unwrap();
-            lock.pending_join_lobby_id = Some("target-lobby".to_string());
+            lock.pending_lobby.lobby_id = Some("target-lobby".to_string());
         }
 
         let wrong_lobby_players = players_info_snapshot("other-lobby", 99, &["user-1"]);
@@ -535,7 +588,7 @@ mod test {
         let game_model: Arc<RwLock<GameModel>> = Arc::new(RwLock::new(GameModel::default()));
         {
             let mut lock = game_model.write().unwrap();
-            lock.pending_join_lobby_id = Some("lobby-2".to_string());
+            lock.pending_lobby.lobby_id = Some("lobby-2".to_string());
         }
 
         let lobby_info = LobbyInfo {
@@ -556,7 +609,7 @@ mod test {
 
         let lock = game_model.read().unwrap();
         assert_eq!(lock.active_lobby_id, Some("lobby-2".to_string()));
-        assert_eq!(lock.pending_join_lobby_id, None);
+        assert_eq!(lock.pending_lobby.lobby_id, None);
     }
 
     fn players_info_snapshot(
