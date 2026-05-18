@@ -4,6 +4,10 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Args {
+    /// Whether the user must correct errors before moving on to the next word
+    #[arg(short, long, default_value_t = false)]
+    pub no_error: bool,
+
     /// How many times per second the tui is drawn.
     #[arg(short, long, default_value_t = 30)]
     pub fps: usize,
