@@ -12,7 +12,6 @@ use ratatui::symbols;
 use ratatui::text::ToSpan;
 use ratatui::widgets::{Block, LineGauge, Paragraph, Widget};
 use tokio::sync::mpsc::{self, UnboundedSender};
-use tokio::time::{Interval, interval};
 use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
