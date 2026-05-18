@@ -33,7 +33,7 @@ pub struct SharedModel {
 }
 
 pub enum SinglePlayerScreen {
-    Typing(TypingModel),
+    Typing(Box<TypingModel>),
     End(EndScreenModel),
 }
 
@@ -47,11 +47,11 @@ impl SinglePlayerModel {
         let text = &data.text;
 
         SinglePlayerModel {
-            screen: SinglePlayerScreen::Typing(TypingModel::new(
+            screen: SinglePlayerScreen::Typing(Box::new(TypingModel::new(
                 text,
                 initial_mode.clone(),
                 no_error,
-            )),
+            ))),
             shared_model: SharedModel {
                 mode: initial_mode,
                 history: vec![],
@@ -126,7 +126,8 @@ pub fn handle_action(
 
             let mode = model.shared_model.mode.clone();
 
-            model.screen = SinglePlayerScreen::Typing(TypingModel::new(text, mode, no_error));
+            model.screen =
+                SinglePlayerScreen::Typing(Box::new(TypingModel::new(text, mode, no_error)));
         }
         action::Action::NewEndScreen {
             final_wpm,
