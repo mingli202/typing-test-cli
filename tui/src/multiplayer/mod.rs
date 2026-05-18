@@ -194,13 +194,27 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             lobby_line.render(lobby_line_area, buf);
 
             let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
+            let status_area = data_area
+                .resize(Size {
+                    width: data_area.width,
+                    height: 1,
+                })
+                .offset(Offset { x: 0, y: -2 });
 
-            let max_offset = data_area.y - 3;
+            let max_offset = status_area.y - 1;
+
+            let mut is_leader = false;
 
             if let Some(ref players) = lock.players_info
                 && let Some(ref user_id) = lock.user_id
             {
                 view_players(players, user_id, max_offset, area, buf);
+
+                is_leader = players.players.contains_key(user_id);
+            }
+
+            if let Some(ref game_status) = lock.game_status {
+                view_game_status(game_status, is_leader, status_area, buf);
             }
 
             view_typing_test(&lobby.typing, data_area, buf);
@@ -208,6 +222,31 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Leave <Esc>"], area, buf);
         }
     };
+}
+
+/// Show the game status
+fn view_game_status(game_status: &GameStatus, is_leader: bool, area: Rect, buf: &mut Buffer) {
+    let txt = match game_status {
+        GameStatus::Waiting => {
+            if is_leader {
+                line!("Press ENTER to start")
+            } else {
+                line!("Waiting for leader")
+            }
+        }
+        GameStatus::Countdown(count_down) => {
+            line!("Start in ", count_down.to_span())
+        }
+        GameStatus::Playing => {
+            line!("Go!")
+        }
+        GameStatus::End => {
+            line!("Game has ended, wait for leader to start again or leave")
+        }
+    };
+
+    let centered = area.centered_horizontally(Constraint::Length(txt.width() as u16));
+    txt.render(centered, buf);
 }
 
 /// renders the players
