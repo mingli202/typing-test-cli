@@ -31,7 +31,7 @@ impl Letter {
     }
 
     /// factory with typed letter
-    pub fn with_typed_letter(self, typed_letter: TypedState) -> Self {
+    pub fn with_typed_state(self, typed_letter: TypedState) -> Self {
         Letter {
             typed_state: typed_letter,
             ..self
