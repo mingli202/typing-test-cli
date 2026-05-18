@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 use futures::{SinkExt, Stream, StreamExt};
 use serde::Deserialize;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
@@ -150,6 +151,7 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
             lock.lobby = Some(Lobby {
                 typing: Typing::new(&lobby_info.data.text).stop_on_error(true),
                 lobby_info,
+                done: false,
             });
             lock.active_lobby_id = Some(lobby_id.clone());
             lock.game_status = Some(GameStatus::Waiting);
@@ -282,7 +284,7 @@ mod test {
     use std::collections::{HashMap, VecDeque};
     use std::fmt::Display;
     use std::task::Poll;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use crate::multiplayer::MultiplayerModel;
     use crate::util::data_provider::Data;
@@ -722,6 +724,7 @@ mod test {
             game_model,
             write_tx,
             input_lobby_id: vec![],
+            last_sent_update: Instant::now(),
         };
 
         // Act
@@ -785,6 +788,7 @@ mod test {
             game_model: Arc::clone(&game_model),
             write_tx,
             input_lobby_id: vec![],
+            last_sent_update: Instant::now(),
         };
 
         let lobby_info = LobbyInfo {
