@@ -73,11 +73,7 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
                             MultiplayerModel::new(model.event_tx.clone()),
                         )));
                     } else {
-                        let initial_mode = model.config.data.mode.clone();
-                        let data = model.data_provider.get_data_from_mode(&initial_mode);
-                        return Some(Action::SwitchScreen(Screen::SinglePlayer(
-                            SinglePlayerModel::new(data, initial_mode, model.args.no_error),
-                        )));
+                        return Some(Action::SwitchToSinglePlayer);
                     }
                 }
                 _ => {}
