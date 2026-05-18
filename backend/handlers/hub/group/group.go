@@ -264,13 +264,15 @@ func (group *Group) countDown() {
 	ticker := time.Tick(time.Second * 1)
 	countdown := 10
 
+	group.broadcast(models.CountdownMessage{Countdown: countdown})
 	for _ = range ticker {
+		countdown -= 1
+
 		if countdown == 0 {
 			return
 		}
 
 		group.broadcast(models.CountdownMessage{Countdown: countdown})
-		countdown -= 1
 	}
 }
 
