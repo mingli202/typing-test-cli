@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crossterm::event::{KeyCode, KeyModifiers};
 use itertools::Itertools;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect};
+use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect, Size};
 use ratatui::macros::{line, span};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::symbols;
@@ -193,13 +193,16 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                 area.centered_horizontally(Constraint::Length(lobby_line.width() as u16));
             lobby_line.render(lobby_line_area, buf);
 
+            let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
+
+            let max_offset = data_area.y - 3;
+
             if let Some(ref players) = lock.players_info
                 && let Some(ref user_id) = lock.user_id
             {
-                view_players(players, user_id, area, buf);
+                view_players(players, user_id, max_offset, area, buf);
             }
 
-            let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
             view_typing_test(&lobby.typing, data_area, buf);
 
             view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Leave <Esc>"], area, buf);
@@ -208,10 +211,21 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
 }
 
 /// renders the players
-fn view_players(players: &PlayersInfoSnapshot, me: &str, area: Rect, buf: &mut Buffer) {
+fn view_players(
+    players: &PlayersInfoSnapshot,
+    me: &str,
+    max_offset: u16,
+    area: Rect,
+    buf: &mut Buffer,
+) {
     let area = area
         .centered_horizontally(Constraint::Max(80))
         .offset(Offset { x: 0, y: 2 });
+
+    let area = area.resize(Size {
+        width: area.width,
+        height: area.height / 2 - 6,
+    });
 
     let players = players
         .players
@@ -226,6 +240,10 @@ fn view_players(players: &PlayersInfoSnapshot, me: &str, area: Rect, buf: &mut B
 
     for (i, (id, player)) in players.enumerate() {
         let area = area.offset(Offset { x: 0, y: i as i32 });
+
+        if area.y > max_offset {
+            break;
+        };
 
         let ratio = player.progress_percent as f64 / 100.0;
 
