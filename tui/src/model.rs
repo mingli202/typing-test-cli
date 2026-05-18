@@ -118,6 +118,15 @@ pub fn handle_action(model: &mut AppModel, action: Action) -> Option<Action> {
     match action {
         Action::Quit => model.exit = true,
         Action::SwitchScreen(screen) => model.screen = screen,
+        Action::SwitchToSinglePlayer => {
+            let initial_mode = model.config.data.mode.clone();
+            let data = model.data_provider.get_data_from_mode(&initial_mode);
+            let no_error = model.args.no_error;
+
+            return Some(Action::SwitchScreen(Screen::SinglePlayer(
+                SinglePlayerModel::new(data, initial_mode, no_error),
+            )));
+        }
         Action::ConfigModeUpdate(mode) => {
             model.config.data.mode = mode.clone();
             model.config.handle_config_update(ConfigUpdate::Mode(mode));

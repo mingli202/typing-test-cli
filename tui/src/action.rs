@@ -5,4 +5,5 @@ pub enum Action {
     Quit,
     ConfigModeUpdate(Mode),
     SwitchScreen(Screen),
+    SwitchToSinglePlayer,
 }
