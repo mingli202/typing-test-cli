@@ -227,12 +227,22 @@ fn view_players(players: &PlayersInfoSnapshot, me: &str, area: Rect, buf: &mut B
     for (i, (id, player)) in players.enumerate() {
         let area = area.offset(Offset { x: 0, y: i as i32 });
 
-        let id = &id[..6];
+        let ratio = player.progress_percent as f64 / 100.0;
+
+        let short_id = &id[..6];
+
+        let mut label = span!(format!("{} {}%", short_id, player.progress_percent));
+
+        if id == me {
+            label = label.underlined();
+        }
+
         LineGauge::default()
-            .label(format!("{} {}%", id, player.progress_percent))
+            .label(label)
             .filled_style(Style::new().white())
             .filled_symbol(symbols::line::THICK_HORIZONTAL)
-            .ratio(player.progress_percent as f64 / 100.0)
+            .unfilled_symbol(" ")
+            .ratio(ratio.clamp(0.0, 1.0))
             .render(area, buf)
     }
 }
