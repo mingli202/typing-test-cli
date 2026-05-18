@@ -134,6 +134,101 @@ pub fn update(
     }
 }
 
+/// the update part of the view without a lobby
+fn update_no_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
+    match msg {
+        Msg::Key(key) => {
+            match key.code {
+                KeyCode::Char(c) => {
+                    if c == 'n' && matches!(key.modifiers, KeyModifiers::CONTROL) {
+                        model.send_msg(WsMsg::NewGroup);
+                        return None;
+                    }
+
+                    if !c.is_ascii_lowercase() || model.input_lobby_id.len() >= 6 {
+                        return None;
+                    }
+
+                    model.input_lobby_id.push(c);
+                }
+                KeyCode::Backspace => {
+                    model.input_lobby_id.pop();
+                }
+                KeyCode::Enter => {
+                    let lobby_id = model.input_lobby_id.iter().collect();
+                    model.send_msg(WsMsg::JoinGroup(lobby_id));
+                }
+                _ => {}
+            };
+        }
+        Msg::Tick => {}
+        _ => {}
+    };
+
+    None
+}
+
+/// the update part of the view with a lobby
+fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
+    match msg {
+        Msg::Key(key) => match key.code {
+            KeyCode::Char(c) => {
+                let is_playing = {
+                    let lock = model.game_model.read().unwrap();
+                    lock.game_status == Some(GameStatus::Playing)
+                };
+
+                if is_playing {
+                    let mut lock = model.game_model.write().unwrap();
+                    if let Some(lobby) = &mut lock.lobby {
+                        lobby.typing.on_type(c);
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                model.send_msg(WsMsg::LeaveGroup);
+            }
+            KeyCode::Backspace => {
+                let is_playing = {
+                    let lock = model.game_model.read().unwrap();
+                    lock.game_status == Some(GameStatus::Playing)
+                };
+
+                if is_playing {
+                    let mut lock = model.game_model.write().unwrap();
+                    if let Some(lobby) = &mut lock.lobby {
+                        lobby.typing.on_backspace();
+                    }
+                }
+            }
+            KeyCode::Enter => {
+                let is_leader = {
+                    let lock = model.game_model.read().unwrap();
+
+                    let mut is_leader = false;
+
+                    if let Some(ref players) = lock.players_info
+                        && let Some(ref user_id) = lock.user_id
+                    {
+                        is_leader = players.players.contains_key(user_id);
+                    }
+
+                    is_leader
+                };
+
+                if is_leader {
+                    model.send_msg(WsMsg::StartGame);
+                }
+            }
+            _ => {}
+        },
+        Msg::Tick => {}
+        _ => {}
+    };
+
+    None
+}
+
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
     let lock = model.game_model.read().unwrap();
 
@@ -302,99 +397,4 @@ fn view_players(
             .ratio(ratio.clamp(0.0, 1.0))
             .render(area, buf)
     }
-}
-
-/// the update part of the view without a lobby
-fn update_no_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
-    match msg {
-        Msg::Key(key) => {
-            match key.code {
-                KeyCode::Char(c) => {
-                    if c == 'n' && matches!(key.modifiers, KeyModifiers::CONTROL) {
-                        model.send_msg(WsMsg::NewGroup);
-                        return None;
-                    }
-
-                    if !c.is_ascii_lowercase() || model.input_lobby_id.len() >= 6 {
-                        return None;
-                    }
-
-                    model.input_lobby_id.push(c);
-                }
-                KeyCode::Backspace => {
-                    model.input_lobby_id.pop();
-                }
-                KeyCode::Enter => {
-                    let lobby_id = model.input_lobby_id.iter().collect();
-                    model.send_msg(WsMsg::JoinGroup(lobby_id));
-                }
-                _ => {}
-            };
-        }
-        Msg::Tick => {}
-        _ => {}
-    };
-
-    None
-}
-
-/// the update part of the view with a lobby
-fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
-    match msg {
-        Msg::Key(key) => match key.code {
-            KeyCode::Char(c) => {
-                let is_playing = {
-                    let lock = model.game_model.read().unwrap();
-                    lock.game_status == Some(GameStatus::Playing)
-                };
-
-                if is_playing {
-                    let mut lock = model.game_model.write().unwrap();
-                    if let Some(lobby) = &mut lock.lobby {
-                        lobby.typing.on_type(c);
-                    }
-                }
-            }
-            KeyCode::Esc => {
-                model.send_msg(WsMsg::LeaveGroup);
-            }
-            KeyCode::Backspace => {
-                let is_playing = {
-                    let lock = model.game_model.read().unwrap();
-                    lock.game_status == Some(GameStatus::Playing)
-                };
-
-                if is_playing {
-                    let mut lock = model.game_model.write().unwrap();
-                    if let Some(lobby) = &mut lock.lobby {
-                        lobby.typing.on_backspace();
-                    }
-                }
-            }
-            KeyCode::Enter => {
-                let is_leader = {
-                    let lock = model.game_model.read().unwrap();
-
-                    let mut is_leader = false;
-
-                    if let Some(ref players) = lock.players_info
-                        && let Some(ref user_id) = lock.user_id
-                    {
-                        is_leader = players.players.contains_key(user_id);
-                    }
-
-                    is_leader
-                };
-
-                if is_leader {
-                    model.send_msg(WsMsg::StartGame);
-                }
-            }
-            _ => {}
-        },
-        Msg::Tick => {}
-        _ => {}
-    };
-
-    None
 }
