@@ -229,7 +229,9 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
         Msg::Tick => {
             if model.last_sent_update.elapsed() > Duration::from_millis(200) {
                 let lock = model.game_model.read().unwrap();
-                if let Some(ref lobby) = lock.lobby {
+                if lock.game_status == Some(GameStatus::Playing)
+                    && let Some(ref lobby) = lock.lobby
+                {
                     let wpm = lobby.typing.net_wpm();
                     let mut progress =
                         lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
