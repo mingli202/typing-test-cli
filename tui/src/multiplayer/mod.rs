@@ -364,7 +364,11 @@ fn view_game_status(game_status: &GameStatus, is_leader: bool, area: Rect, buf: 
             line!("Go!")
         }
         GameStatus::End => {
-            line!("Game has ended, wait for leader to start again or leave")
+            if is_leader {
+                line!("Game has ended, press ENTER to restart")
+            } else {
+                line!("Game has ended, wait for leader to start again or leave")
+            }
         }
     };
 
