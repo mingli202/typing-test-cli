@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::sync::{Arc, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossterm::event::{KeyCode, KeyModifiers};
 use itertools::Itertools;
@@ -12,6 +12,7 @@ use ratatui::symbols;
 use ratatui::text::ToSpan;
 use ratatui::widgets::{Block, LineGauge, Paragraph, Widget};
 use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::time::{Interval, interval};
 use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
@@ -37,6 +38,7 @@ pub enum GameStatus {
 pub struct Lobby {
     lobby_info: LobbyInfo,
     typing: Typing,
+    done: bool,
 }
 
 #[derive(Default)]
@@ -59,6 +61,7 @@ pub struct MultiplayerModel {
     game_model: Arc<RwLock<GameModel>>,
     write_tx: UnboundedSender<String>,
     input_lobby_id: Vec<char>,
+    last_sent_update: Instant,
 
     cancel_token: CancellationToken,
 }
@@ -72,6 +75,7 @@ impl MultiplayerModel {
             write_tx,
             cancel_token: CancellationToken::new(),
             input_lobby_id: vec![],
+            last_sent_update: Instant::now(),
         };
 
         let game_model = Arc::clone(&model.game_model);
@@ -181,7 +185,8 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                 if is_playing {
                     let mut lock = model.game_model.write().unwrap();
                     if let Some(lobby) = &mut lock.lobby {
-                        lobby.typing.on_type(c);
+                        let done = lobby.typing.on_type(c);
+                        lobby.done = done;
                     }
                 }
             }
@@ -222,7 +227,24 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
             }
             _ => {}
         },
-        Msg::Tick => {}
+        Msg::Tick => {
+            if model.last_sent_update.elapsed() > Duration::from_millis(200) {
+                let lock = model.game_model.read().unwrap();
+                if let Some(ref lobby) = lock.lobby {
+                    let wpm = lobby.typing.net_wpm();
+                    let mut progress =
+                        lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
+
+                    if progress > 100 {
+                        progress = 100;
+                    }
+
+                    model.send_msg(WsMsg::UpdateStats(wpm, progress as u8));
+                }
+
+                model.last_sent_update = Instant::now();
+            }
+        }
         _ => {}
     };
 
