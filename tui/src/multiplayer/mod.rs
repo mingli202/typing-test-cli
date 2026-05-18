@@ -313,20 +313,21 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                 area.centered_horizontally(Constraint::Length(lobby_line.width() as u16));
             lobby_line.render(lobby_line_area, buf);
 
+            let is_leader = {
+                if let Some(ref players) = lock.players_info
+                    && let Some(ref user_id) = lock.user_id
+                {
+                    players
+                        .players
+                        .get(user_id)
+                        .is_some_and(|player| player.is_leader)
+                } else {
+                    false
+                }
+            };
+
             let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
             let mut status_area = data_area.offset(Offset { x: 0, y: -2 });
-
-            let mut is_leader = false;
-
-            if let Some(ref players) = lock.players_info
-                && let Some(ref user_id) = lock.user_id
-            {
-                is_leader = players
-                    .players
-                    .get(user_id)
-                    .is_some_and(|player| player.is_leader);
-            }
-
             if let Some(ref game_status) = lock.game_status {
                 status_area = view_game_status(game_status, is_leader, status_area, buf);
             }
