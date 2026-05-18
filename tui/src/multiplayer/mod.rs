@@ -371,6 +371,25 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                     }
                 }
             }
+            KeyCode::Enter => {
+                let is_leader = {
+                    let lock = model.game_model.read().unwrap();
+
+                    let mut is_leader = false;
+
+                    if let Some(ref players) = lock.players_info
+                        && let Some(ref user_id) = lock.user_id
+                    {
+                        is_leader = players.players.contains_key(user_id);
+                    }
+
+                    is_leader
+                };
+
+                if is_leader {
+                    model.send_msg(WsMsg::StartGame);
+                }
+            }
             _ => {}
         },
         Msg::Tick => {}
