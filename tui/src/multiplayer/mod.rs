@@ -1,18 +1,23 @@
+use std::cmp::Ordering;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crossterm::event::{KeyCode, KeyModifiers};
+use itertools::Itertools;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect};
 use ratatui::macros::{line, span};
-use ratatui::style::{Color, Stylize};
+use ratatui::style::{Color, Style, Stylize};
+use ratatui::symbols;
 use ratatui::text::ToSpan;
-use ratatui::widgets::{Block, Paragraph, Widget};
+use ratatui::widgets::{Block, LineGauge, Paragraph, Widget};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
+use crate::model::Screen;
 use crate::msg::Msg;
+use crate::singleplayer::SinglePlayerScreen;
 use crate::typing::{Typing, view_typing_test};
 use crate::util::toast::ToastMessage;
 use crate::util::{toast, view_helpers};
@@ -37,10 +42,16 @@ pub struct Lobby {
 }
 
 #[derive(Default)]
+pub struct PendingLobby {
+    lobby_id: Option<String>,
+    pending_players: Option<PlayersInfoSnapshot>,
+}
+
+#[derive(Default)]
 pub struct GameModel {
     user_id: Option<String>,
     active_lobby_id: Option<String>,
-    pending_join_lobby_id: Option<String>,
+    pending_lobby: PendingLobby,
     players_info: Option<PlayersInfoSnapshot>,
     lobby: Option<Lobby>,
     game_status: Option<GameStatus>,
@@ -52,6 +63,7 @@ pub struct MultiplayerModel {
     input_lobby_id: Vec<char>,
 
     cancel_token: CancellationToken,
+    event_tx: UnboundedSender<CustomEvent>,
 }
 
 impl MultiplayerModel {
@@ -63,15 +75,17 @@ impl MultiplayerModel {
             write_tx,
             cancel_token: CancellationToken::new(),
             input_lobby_id: vec![],
+            event_tx: event_tx.clone(),
         };
 
         let game_model = Arc::clone(&model.game_model);
         let cancel_token = model.cancel_token.clone();
         tokio::spawn(async move {
             if let Err(err) =
-                connect_to_ws(game_model, cancel_token, event_tx.clone(), write_rx).await
+                connect_to_ws(game_model, cancel_token.clone(), event_tx.clone(), write_rx).await
             {
                 let _ = toast::send(&event_tx, ToastMessage::error(err.to_string()));
+                cancel_token.cancel();
             }
         });
 
@@ -88,7 +102,7 @@ impl MultiplayerModel {
 
         if did_send && let Some(group_id) = pending_join_lobby_id {
             let mut lock = self.game_model.write().unwrap();
-            lock.pending_join_lobby_id = Some(group_id);
+            lock.pending_lobby.lobby_id = Some(group_id);
         }
     }
 }
@@ -105,6 +119,14 @@ pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::A
         lock.lobby.is_some()
     };
 
+    if model.cancel_token.is_cancelled() {
+        let _ = toast::send(
+            &model.event_tx,
+            ToastMessage::error("Multiplayer crashed, back to singleplayer".to_string()),
+        );
+        return Some(crate::action::Action::SwitchToSinglePlayer);
+    }
+
     if is_in_lobby {
         update_lobby_info(model, msg)
     } else {
@@ -115,7 +137,7 @@ pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::A
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
     let lock = model.game_model.read().unwrap();
 
-    match &lock.lobby {
+    match lock.lobby {
         None => {
             let t = match SystemTime::now().duration_since(UNIX_EPOCH) {
                 Ok(n) => n.as_secs(),
@@ -165,11 +187,17 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
 
             view_helpers::view_bottom_menu(&["Singleplayer <C-p>"], area, buf);
         }
-        Some(lobby) => {
+        Some(ref lobby) => {
             let lobby_line = line!("Id: ", span!(lobby.lobby_info.lobby_id));
             let lobby_line_area =
                 area.centered_horizontally(Constraint::Length(lobby_line.width() as u16));
             lobby_line.render(lobby_line_area, buf);
+
+            if let Some(ref players) = lock.players_info
+                && let Some(ref user_id) = lock.user_id
+            {
+                view_players(players, user_id, area, buf);
+            }
 
             let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
             view_typing_test(&lobby.typing, data_area, buf);
@@ -177,6 +205,36 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Leave <Esc>"], area, buf);
         }
     };
+}
+
+/// renders the players
+fn view_players(players: &PlayersInfoSnapshot, me: &str, area: Rect, buf: &mut Buffer) {
+    let area = area
+        .centered_horizontally(Constraint::Max(80))
+        .offset(Offset { x: 0, y: 2 });
+
+    let players = players
+        .players
+        .iter()
+        .sorted_by(|(id_a, player_a), (_, player_b)| {
+            if *id_a == me {
+                return Ordering::Less;
+            }
+
+            Ord::cmp(&player_a.progress_percent, &player_b.progress_percent)
+        });
+
+    for (i, (id, player)) in players.enumerate() {
+        let area = area.offset(Offset { x: 0, y: i as i32 });
+
+        let id = &id[..6];
+        LineGauge::default()
+            .label(format!("{} {}%", id, player.progress_percent))
+            .filled_style(Style::new().white())
+            .filled_symbol(symbols::line::THICK_HORIZONTAL)
+            .ratio(player.progress_percent as f64 / 100.0)
+            .render(area, buf)
+    }
 }
 
 /// the update part of the view without a lobby
