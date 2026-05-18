@@ -15,9 +15,7 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
-use crate::model::Screen;
 use crate::msg::Msg;
-use crate::singleplayer::SinglePlayerScreen;
 use crate::typing::{Typing, view_typing_test};
 use crate::util::toast::ToastMessage;
 use crate::util::{toast, view_helpers};
