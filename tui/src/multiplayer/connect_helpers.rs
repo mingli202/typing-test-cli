@@ -9,10 +9,11 @@ use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
 use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
+use crate::typing::Typing;
 use crate::util::toast::{self, ToastMessage};
 
 use super::models::{LobbyInfo, NewGame, PlayersInfoSnapshot};
-use super::{GameModel, GameStatus};
+use super::{GameModel, GameStatus, Lobby};
 
 /// Connects to the ws
 pub async fn connect_to_ws(
@@ -146,7 +147,10 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
             let mut lock = game_model.write().unwrap();
             let lobby_id = lobby_info.lobby_id.clone();
 
-            lock.lobby_info = Some(lobby_info);
+            lock.lobby = Some(Lobby {
+                typing: Typing::new(&lobby_info.data.text).stop_on_error(true),
+                lobby_info,
+            });
             lock.active_lobby_id = Some(lobby_id.clone());
             if lock.pending_join_lobby_id.as_deref() == Some(lobby_id.as_str()) {
                 lock.pending_join_lobby_id = None;
@@ -156,8 +160,9 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
         "NewGame" => {
             let new_game = parse_payload_json::<NewGame>(&words)?;
             let mut lock = game_model.write().unwrap();
-            if let Some(lobby_info) = &mut lock.lobby_info {
-                lobby_info.data = new_game.data;
+            if let Some(lobby) = &mut lock.lobby {
+                lobby.typing = Typing::new(&new_game.data.text).stop_on_error(true);
+                lobby.lobby_info.data = new_game.data;
             }
             lock.players_info = Some(new_game.players_info)
         }
@@ -233,7 +238,7 @@ fn clear_game_model(game_model: Arc<RwLock<GameModel>>) {
     lock.active_lobby_id = None;
     lock.pending_join_lobby_id = None;
     lock.players_info = None;
-    lock.lobby_info = None;
+    lock.lobby = None;
     lock.game_status = None;
 }
 
@@ -361,14 +366,20 @@ mod test {
 
         assert_eq!(parse_ws_msg(&msg, Arc::clone(&game_model)), Ok(()));
         assert_eq!(
-            game_model.read().unwrap().lobby_info,
-            Some(LobbyInfo {
+            game_model
+                .read()
+                .unwrap()
+                .lobby
+                .as_ref()
+                .unwrap()
+                .lobby_info,
+            LobbyInfo {
                 lobby_id: "some-id".to_string(),
                 data: Data {
                     text: "test text".to_string(),
                     source: "test source".to_string()
                 }
-            })
+            }
         )
     }
 
@@ -429,7 +440,7 @@ mod test {
 
         let lock = game_model.read().unwrap();
         assert_eq!(lock.user_id, Some("user-1".to_string()));
-        assert_eq!(lock.lobby_info, None);
+        assert_eq!(lock.lobby.is_none(), true);
         assert_eq!(lock.players_info, None);
         assert!(lock.game_status.is_none());
     }
@@ -747,7 +758,7 @@ mod test {
         // Assert
         {
             let lock = game_model.read().unwrap();
-            assert_eq!(lock.lobby_info, Some(lobby_info));
+            assert_eq!(lock.lobby.as_ref().unwrap().lobby_info, lobby_info);
         }
 
         // Cleanup

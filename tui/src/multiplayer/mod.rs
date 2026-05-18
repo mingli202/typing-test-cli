@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::CustomEvent;
 use crate::msg::Msg;
+use crate::typing::{Typing, view_typing_test};
 use crate::util::toast::ToastMessage;
 use crate::util::{toast, view_helpers};
 
@@ -29,13 +30,18 @@ pub enum GameStatus {
     End,
 }
 
+pub struct Lobby {
+    lobby_info: LobbyInfo,
+    typing: Typing,
+}
+
 #[derive(Default)]
 pub struct GameModel {
     user_id: Option<String>,
     active_lobby_id: Option<String>,
     pending_join_lobby_id: Option<String>,
     players_info: Option<PlayersInfoSnapshot>,
-    lobby_info: Option<LobbyInfo>,
+    lobby: Option<Lobby>,
     game_status: Option<GameStatus>,
 }
 
@@ -128,7 +134,7 @@ pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::A
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
     let lock = model.game_model.read().unwrap();
 
-    match &lock.lobby_info {
+    match &lock.lobby {
         None => {
             let t = match SystemTime::now().duration_since(UNIX_EPOCH) {
                 Ok(n) => n.as_secs(),
@@ -176,17 +182,14 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                 });
             create_text.render(create_text_area, buf);
         }
-        Some(lobby_info) => {
-            let lobby_line = line!("Id: ", span!(lobby_info.lobby_id));
+        Some(lobby) => {
+            let lobby_line = line!("Id: ", span!(lobby.lobby_info.lobby_id));
             let lobby_line_area =
                 area.centered_horizontally(Constraint::Length(lobby_line.width() as u16));
             lobby_line.render(lobby_line_area, buf);
 
-            let data_text = text!(lobby_info.data.text.clone());
             let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
-            Paragraph::new(data_text)
-                .wrap(Wrap { trim: true })
-                .render(data_area, buf);
+            view_typing_test(&lobby.typing, data_area, buf);
         }
     };
 
