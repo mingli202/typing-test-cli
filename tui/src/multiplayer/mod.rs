@@ -61,7 +61,6 @@ pub struct MultiplayerModel {
     input_lobby_id: Vec<char>,
 
     cancel_token: CancellationToken,
-    event_tx: UnboundedSender<CustomEvent>,
 }
 
 impl MultiplayerModel {
@@ -73,7 +72,6 @@ impl MultiplayerModel {
             write_tx,
             cancel_token: CancellationToken::new(),
             input_lobby_id: vec![],
-            event_tx: event_tx.clone(),
         };
 
         let game_model = Arc::clone(&model.game_model);
@@ -111,7 +109,11 @@ impl Drop for MultiplayerModel {
     }
 }
 
-pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
+pub fn update(
+    model: &mut MultiplayerModel,
+    event_tx: &UnboundedSender<CustomEvent>,
+    msg: Msg,
+) -> Option<crate::action::Action> {
     let is_in_lobby = {
         let lock = model.game_model.read().unwrap();
         lock.lobby.is_some()
@@ -119,7 +121,7 @@ pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::A
 
     if model.cancel_token.is_cancelled() {
         let _ = toast::send(
-            &model.event_tx,
+            event_tx,
             ToastMessage::error("Multiplayer crashed, back to singleplayer".to_string()),
         );
         return Some(crate::action::Action::SwitchToSinglePlayer);

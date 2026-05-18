@@ -87,7 +87,7 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
                     msg,
                 ),
                 Screen::Multiplayer(multiplayer_model) => {
-                    multiplayer::update(multiplayer_model, msg)
+                    multiplayer::update(multiplayer_model, &model.event_tx, msg)
                 }
             };
         }
