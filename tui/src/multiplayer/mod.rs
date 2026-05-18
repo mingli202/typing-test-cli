@@ -99,36 +99,16 @@ impl Drop for MultiplayerModel {
 }
 
 pub fn update(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
-    match msg {
-        Msg::Key(key) => {
-            match key.code {
-                KeyCode::Char(c) => {
-                    if c == 'n' && matches!(key.modifiers, KeyModifiers::CONTROL) {
-                        model.send_msg(WsMsg::NewGroup);
-                        return None;
-                    }
-
-                    if !c.is_ascii_lowercase() || model.input_lobby_id.len() >= 6 {
-                        return None;
-                    }
-
-                    model.input_lobby_id.push(c);
-                }
-                KeyCode::Backspace => {
-                    model.input_lobby_id.pop();
-                }
-                KeyCode::Enter => {
-                    let lobby_id = model.input_lobby_id.iter().collect();
-                    model.send_msg(WsMsg::JoinGroup(lobby_id));
-                }
-                _ => {}
-            };
-        }
-        Msg::Tick => {}
-        _ => {}
+    let is_in_lobby = {
+        let lock = model.game_model.read().unwrap();
+        lock.lobby.is_some()
     };
 
-    None
+    if is_in_lobby {
+        None
+    } else {
+        update_no_lobby_info(model, msg)
+    }
 }
 
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
@@ -181,6 +161,8 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                     y: layout[0].height as i32,
                 });
             create_text.render(create_text_area, buf);
+
+            view_helpers::view_bottom_menu(&["Singleplayer <C-p>"], area, buf);
         }
         Some(lobby) => {
             let lobby_line = line!("Id: ", span!(lobby.lobby_info.lobby_id));
@@ -190,8 +172,42 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
 
             let data_area = area.centered(Constraint::Max(80), Constraint::Length(3));
             view_typing_test(&lobby.typing, data_area, buf);
+
+            view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Leave <Esc>"], area, buf);
         }
     };
+}
 
-    view_helpers::view_bottom_menu(&["Singleplayer <C-p>"], area, buf);
+/// the update part of the view without a lobby
+fn update_no_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::action::Action> {
+    match msg {
+        Msg::Key(key) => {
+            match key.code {
+                KeyCode::Char(c) => {
+                    if c == 'n' && matches!(key.modifiers, KeyModifiers::CONTROL) {
+                        model.send_msg(WsMsg::NewGroup);
+                        return None;
+                    }
+
+                    if !c.is_ascii_lowercase() || model.input_lobby_id.len() >= 6 {
+                        return None;
+                    }
+
+                    model.input_lobby_id.push(c);
+                }
+                KeyCode::Backspace => {
+                    model.input_lobby_id.pop();
+                }
+                KeyCode::Enter => {
+                    let lobby_id = model.input_lobby_id.iter().collect();
+                    model.send_msg(WsMsg::JoinGroup(lobby_id));
+                }
+                _ => {}
+            };
+        }
+        Msg::Tick => {}
+        _ => {}
+    };
+
+    None
 }
