@@ -20,9 +20,7 @@ func NewNameProvider() (NameProvider, error) {
 		return defaultNameProvider(), nil
 	}
 
-	return NameProvider{
-		repository: repository,
-	}, nil
+	return NameProvider{repository}, nil
 }
 
 // Returns a default provider in cases of errors
