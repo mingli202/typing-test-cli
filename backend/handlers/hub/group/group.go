@@ -11,6 +11,7 @@ import (
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
+	"tui/backend/services/name_provider"
 )
 
 type GameStatus int
@@ -33,6 +34,7 @@ type Group struct {
 	playerInfoVersion uint64
 	status            GameStatus
 	end               chan struct{}
+	namesProvider     *name_provider.NameProvider
 }
 
 func (group *Group) Id() string {
@@ -71,8 +73,10 @@ func (group *Group) AddUser(u *user.User) {
 	}
 
 	if group.status != Playing {
+		name := group.newNameLocked()
 		group.playerInfo[u.Id()] = &models.PlayerInfo{
 			IsLeader: *group.leaderId == u.Id(),
+			Name:     name,
 		}
 	}
 
@@ -475,4 +479,30 @@ func (group *Group) canUserStartGame(u *user.User) error {
 	}
 
 	return nil
+}
+
+// Returns a new name unique within this group
+func (group *Group) newNameLocked() string {
+	name, _ := group.namesProvider.NewName()
+
+	if group.dataProvider.HasLessThan2Quotes() {
+		return name
+	}
+
+	for !group.nameExist(name) {
+		name, _ = group.namesProvider.NewName()
+	}
+
+	return name
+}
+
+// Check if the given name already exists in this group
+func (group *Group) nameExist(name string) bool {
+	for _, player := range group.playerInfo {
+		if player.Name == name {
+			return true
+		}
+	}
+
+	return false
 }
