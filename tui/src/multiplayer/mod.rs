@@ -418,27 +418,25 @@ fn view_players(
         .rev();
 
     if let Some(me_info) = players_info.players.get(me) {
-        view_player(me, me_info, true, area, buf);
+        view_player(me_info, true, area, buf);
         area.y += 1;
     }
 
-    for (i, (id, player)) in players.enumerate() {
+    for (i, (_, player)) in players.enumerate() {
         let area = area.offset(Offset { x: 0, y: i as i32 });
 
         if area.y > max_offset {
             break;
         };
 
-        view_player(id, player, false, area, buf);
+        view_player(player, false, area, buf);
     }
 }
 
-fn view_player(id: &str, player: &PlayerInfo, is_me: bool, area: Rect, buf: &mut Buffer) {
+fn view_player(player: &PlayerInfo, is_me: bool, area: Rect, buf: &mut Buffer) {
     let ratio = player.progress_percent as f64 / 100.0;
 
-    let short_id = &id[..6];
-
-    let mut label = span!(format!("{} {}%", short_id, player.progress_percent));
+    let mut label = span!(format!("{} {}%", player.name, player.progress_percent));
 
     if is_me {
         label = label.underlined();
