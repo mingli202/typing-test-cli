@@ -41,7 +41,7 @@ func (provider *NameProvider) NewName() (string, error) {
 	randomNounIndex := rand.IntN(nounsLen)
 	randomAdIndex := rand.IntN(adLen)
 
-	return provider.nouns[randomNounIndex] + provider.adjectives[randomAdIndex], nil
+	return provider.adjectives[randomAdIndex] + " " + provider.nouns[randomNounIndex], nil
 }
 
 // Returns whether the nouns or adjectives repo is empty or only 1
