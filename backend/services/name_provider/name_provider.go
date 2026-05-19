@@ -2,6 +2,7 @@ package nameprovider
 
 import (
 	"encoding/json"
+	"log"
 	"tui/backend/assets"
 	"tui/backend/models"
 )
@@ -15,6 +16,8 @@ func NewNameProvider() (NameProvider, error) {
 	var repository models.NamesRepo
 
 	if err := json.Unmarshal(assets.Names, &repository); err != nil {
+		log.Printf("Could no decode into Names: %v", err)
+		return defaultNameProvider(), nil
 	}
 
 	return NameProvider{
