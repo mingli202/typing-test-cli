@@ -445,15 +445,23 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 				return
 			case p := <-ch1:
 				msg1.mu.Lock()
-				msg1.msg = p
+
+				if msg, _ := p.ToMsg(); strings.HasPrefix(msg, "NewGame") {
+					msg1.msg = p
+				}
+
 				msg1.mu.Unlock()
 			case p := <-ch2:
 				msg2.mu.Lock()
-				msg2.msg = p
+				if msg, _ := p.ToMsg(); strings.HasPrefix(msg, "NewGame") {
+					msg2.msg = p
+				}
 				msg2.mu.Unlock()
 			case p := <-ch3:
 				msg3.mu.Lock()
-				msg3.msg = p
+				if msg, _ := p.ToMsg(); strings.HasPrefix(msg, "NewGame") {
+					msg3.msg = p
+				}
 				msg3.mu.Unlock()
 			}
 		}
