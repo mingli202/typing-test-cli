@@ -34,8 +34,8 @@ func TestNewNameSingleEntryReturnsCombinedName(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if name != "GuestHandsome" {
-		t.Fatalf("expected name %q, got %q", "GuestHandsome", name)
+	if name != "Handsome Guest" {
+		t.Fatalf("expected name %q, got %q", "Handsome Guest", name)
 	}
 }
 
