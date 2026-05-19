@@ -1,6 +1,6 @@
 package models
 
 type NamesRepo struct {
-	Names      []string `json:"names"`
+	Nouns      []string `json:"nouns"`
 	Adjectives []string `json:"adjectives"`
 }
