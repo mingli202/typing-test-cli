@@ -625,6 +625,7 @@ mod test {
                 (
                     (*id).to_string(),
                     super::super::models::PlayerInfo {
+                        name: "Handsome Guest".to_string(),
                         is_leader: *id == player_ids[0],
                         wpm: 0.0,
                         progress_percent: 0,
