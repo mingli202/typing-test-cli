@@ -1,4 +1,4 @@
-package nameprovider
+package name_provider
 
 import (
 	"encoding/json"
