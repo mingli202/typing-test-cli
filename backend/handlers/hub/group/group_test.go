@@ -11,12 +11,14 @@ import (
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
+	"tui/backend/services/name_provider"
 )
 
 var dataProvider, _ = data_provider.NewDataProvider()
+var nameProvider, _ = name_provider.NewNameProvider()
 
 func newGroup() *Group {
-	group := NewGroup("asdf", &dataProvider)
+	group := NewGroup("asdf", &dataProvider, &nameProvider)
 
 	return group
 }

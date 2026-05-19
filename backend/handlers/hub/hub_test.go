@@ -16,12 +16,13 @@ import (
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
+	"tui/backend/services/name_provider"
 
 	"github.com/gorilla/websocket"
 )
 
-var dataProviderNoRef, _ = data_provider.NewDataProvider()
-var dataProvider = &dataProviderNoRef
+var dataProvider, _ = data_provider.NewDataProvider()
+var nameProvider, _ = name_provider.NewNameProvider()
 
 // A mock client
 type MockClient struct {
@@ -270,7 +271,7 @@ func TestNewGroupId(t *testing.T) {
 }
 
 func TestHandleNewGroup(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	u := user.NewUser(nil)
 
@@ -300,7 +301,7 @@ func TestHandleNewGroup(t *testing.T) {
 }
 
 func TestHandleJoin(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	user1 := user.NewUser(nil)
 	user2 := user.NewUser(nil)
@@ -390,7 +391,7 @@ func TestHandleJoin(t *testing.T) {
 }
 
 func TestHandleMessageNewGroup(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	user := user.NewUser(nil)
 
@@ -432,7 +433,7 @@ func TestHandleMessageNewGroup(t *testing.T) {
 }
 
 func TestHandleMessageJoinGroup(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	user1 := user.NewUser(nil)
 
@@ -477,7 +478,7 @@ func TestHandleMessageJoinGroup(t *testing.T) {
 }
 
 func TestHandleMessageLeaveGroup(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	user1 := user.NewUser(nil)
 
@@ -547,7 +548,7 @@ func TestHandleMessageLeaveGroup(t *testing.T) {
 }
 
 func TestRemoveUser(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	user1 := user.NewUser(nil)
 	user2 := user.NewUser(nil)
@@ -585,7 +586,7 @@ func TestRemoveUser(t *testing.T) {
 }
 
 func TestHandleLeaveWithoutGroup(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 	user := user.NewUser(nil)
 
 	if hub.handleLeave(&user) == nil {
@@ -594,7 +595,7 @@ func TestHandleLeaveWithoutGroup(t *testing.T) {
 }
 
 func TestLeaveHelperMatchesHandleLeaveBehavior(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	user1 := user.NewUser(nil)
 	user2 := user.NewUser(nil)
@@ -626,7 +627,7 @@ func TestLeaveHelperMatchesHandleLeaveBehavior(t *testing.T) {
 }
 
 func TestHandleMessageJoinGroupBadFormat(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 	user := user.NewUser(nil)
 
 	cases := []string{
@@ -643,7 +644,7 @@ func TestHandleMessageJoinGroupBadFormat(t *testing.T) {
 }
 
 func TestHandleMessageUnknownFunction(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 	user := user.NewUser(nil)
 
 	_, err := hub.handleMessage([]byte("DoesNotExist"), &user)
@@ -658,7 +659,7 @@ func TestHandleMessageUnknownFunction(t *testing.T) {
 }
 
 func TestHandleMessageEmptyInput(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 	user := user.NewUser(nil)
 
 	_, err := hub.handleMessage([]byte(""), &user)
@@ -679,7 +680,7 @@ func TestHandleMessageEmptyInput(t *testing.T) {
 // Issue: UpdateStats accepts negative progress values, which are parsed then cast to uint8.
 // Regression expectation: negative progress should be rejected at message validation time.
 func TestHandleMessageUpdateStatsRejectsNegativeProgress(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 	u := user.NewUser(nil)
 
 	_, err := hub.handleNewGroup(&u)
@@ -700,7 +701,7 @@ func TestHandleMessageUpdateStatsRejectsNegativeProgress(t *testing.T) {
 // Issue: ServeHTTP builds ErrorMessage on handler error but did not send it to clients.
 // Regression expectation: invalid commands should produce an "Error ..." websocket message.
 func TestServeHTTPSendsErrorMessageOnInvalidCommand(t *testing.T) {
-	h := Handler(dataProvider)
+	h := Handler(&dataProvider, &nameProvider)
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 
@@ -742,7 +743,7 @@ func TestServeHTTPSendsErrorMessageOnInvalidCommand(t *testing.T) {
 // Issue: stale/non-existent user.GroupId must not panic in getGroupOfUser.
 // Expected behavior is a regular error that includes the missing group id.
 func TestGetGroupOfUserMissingGroupDoesNotPanic(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 	u := user.NewUser(nil)
 	missingGroupId := "missing-group-id"
 	u.GroupId = &missingGroupId
@@ -764,7 +765,7 @@ func TestGetGroupOfUserMissingGroupDoesNotPanic(t *testing.T) {
 }
 
 func TestConcurrentJoinStability(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	anchor1 := user.NewUser(nil)
 	lobby1, err := hub.handleNewGroup(&anchor1)
@@ -831,7 +832,7 @@ func TestConcurrentJoinStability(t *testing.T) {
 }
 
 func TestNewGroupWithSync(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	mockClient := newMockClient()
 
@@ -856,7 +857,7 @@ func TestNewGroupWithSync(t *testing.T) {
 }
 
 func TestJoinGroupWithSync(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 	mockClient1 := newMockClient()
 	mockClient2 := newMockClient()
 	mockClient3 := newMockClient()
@@ -894,7 +895,7 @@ func TestJoinGroupWithSync(t *testing.T) {
 }
 
 func TestLeaveGroupWithSync(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	mockClient1 := newMockClient()
 	mockClient2 := newMockClient()
@@ -938,7 +939,7 @@ func TestLeaveGroupWithSync(t *testing.T) {
 }
 
 func TestStressTestSync(t *testing.T) {
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	mockClient1 := newMockClient()
 	mockClient2 := newMockClient()
@@ -993,7 +994,7 @@ func TestStressTestSync(t *testing.T) {
 
 func TestJoiningNewGroupWithLowerPlayerinfoVersion(t *testing.T) {
 	// Arrange
-	hub := newHub(dataProvider)
+	hub := newHub(&dataProvider, &nameProvider)
 
 	mockClient1 := newMockClient()
 	mockClient2 := newMockClient()
