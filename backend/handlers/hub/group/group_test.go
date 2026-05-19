@@ -693,3 +693,17 @@ func TestStartGameRepeatedRunsTerminateCleanly(t *testing.T) {
 		}
 	}
 }
+
+func TestAddUserGotNameAdded(t *testing.T) {
+	// Arrange
+	u1 := user.NewUser(nil)
+	gr := newGroup()
+
+	// Act
+	gr.AddUser(&u1)
+
+	// Assert
+	if gr.playerInfo[u1.Id()].Name == "" {
+		t.Error("Player did not have their name set")
+	}
+}
