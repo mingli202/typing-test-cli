@@ -7,6 +7,7 @@ use crate::util::data_provider::Data;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct PlayerInfo {
+    pub name: String,
     pub is_leader: bool,
     pub wpm: f64,
     pub progress_percent: u8,

@@ -12,6 +12,9 @@ type LobbyInfo struct {
 }
 
 type PlayerInfo struct {
+	// A friendly name
+	Name string `json:"name"`
+	// Whether this player is the leader of the group
 	IsLeader bool `json:"is_leader"`
 	// The current wpm of the user, calculated by the tui client
 	Wpm float64 `json:"wpm"`

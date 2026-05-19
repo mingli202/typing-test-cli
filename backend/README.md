@@ -28,7 +28,7 @@ The websocket server communicates with the client via strings that consists of a
 some type definition:
 ```
 Data = { text: string, source: string }
-PlayerInfo = { is_leader: bool, wpm: float64, progress_percent: uint8 }
+PlayerInfo = { name: string, is_leader: bool, wpm: float64, progress_percent: uint8 }
 PlayersInfoSnapshot = {
   lobby_id: string,
   version: uint64,
