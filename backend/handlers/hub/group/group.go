@@ -34,7 +34,7 @@ type Group struct {
 	playerInfoVersion uint64
 	status            GameStatus
 	end               chan struct{}
-	namesProvider     *name_provider.NameProvider
+	nameProvider      *name_provider.NameProvider
 }
 
 func (group *Group) Id() string {
@@ -42,7 +42,7 @@ func (group *Group) Id() string {
 }
 
 // Makes a new group with the given id and data
-func NewGroup(id string, dataProvider *data_provider.DataProvider) *Group {
+func NewGroup(id string, dataProvider *data_provider.DataProvider, nameProvider *name_provider.NameProvider) *Group {
 	data, _ := dataProvider.NewData()
 
 	group := Group{
@@ -52,6 +52,7 @@ func NewGroup(id string, dataProvider *data_provider.DataProvider) *Group {
 		dataProvider: dataProvider,
 		playerInfo:   make(map[string]*models.PlayerInfo),
 		status:       Waiting,
+		nameProvider: nameProvider,
 	}
 
 	return &group
@@ -483,14 +484,14 @@ func (group *Group) canUserStartGame(u *user.User) error {
 
 // Returns a new name unique within this group
 func (group *Group) newNameLocked() string {
-	name, _ := group.namesProvider.NewName()
+	name, _ := group.nameProvider.NewName()
 
 	if group.dataProvider.HasLessThan2Quotes() {
 		return name
 	}
 
 	for !group.nameExist(name) {
-		name, _ = group.namesProvider.NewName()
+		name, _ = group.nameProvider.NewName()
 	}
 
 	return name
