@@ -490,7 +490,7 @@ func (group *Group) newNameLocked() string {
 		return name
 	}
 
-	for !group.nameExist(name) {
+	for group.nameExist(name) {
 		name, _ = group.nameProvider.NewName()
 	}
 
