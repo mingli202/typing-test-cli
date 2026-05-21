@@ -151,7 +151,6 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
             lock.lobby = Some(Lobby {
                 typing: Typing::new(&lobby_info.data.text).stop_on_error(true),
                 lobby_info,
-                done: false,
             });
             lock.active_lobby_id = Some(lobby_id.clone());
             lock.game_status = Some(GameStatus::Waiting);
