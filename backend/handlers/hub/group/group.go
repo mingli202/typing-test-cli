@@ -138,6 +138,12 @@ func (group *Group) GetUsersSnapshot() []*user.User {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
+	return group.GetUsersSnapshotLocked()
+}
+
+// Gets list of users at this moment of calling this function
+// Assumes already holds the mutex lock
+func (group *Group) GetUsersSnapshotLocked() []*user.User {
 	snapShot := make([]*user.User, 0)
 
 	for u := range maps.Values(group.users) {
@@ -426,9 +432,17 @@ func (group *Group) resetPlayerInfo() {
 	defer group.mu.Unlock()
 
 	for _, userId := range group.GetUserIdsSnapshotLocked() {
-		group.playerInfo[userId] = &models.PlayerInfo{
+		newPlayerInfo := &models.PlayerInfo{
 			IsLeader: group.leaderId != nil && *group.leaderId == userId,
 		}
+
+		if existingPlayerInfo, ok := group.playerInfo[userId]; ok {
+			newPlayerInfo.Name = existingPlayerInfo.Name
+		} else {
+			newPlayerInfo.Name = group.newNameLocked()
+		}
+
+		group.playerInfo[userId] = newPlayerInfo
 	}
 
 	group.playerInfoVersion += 1
