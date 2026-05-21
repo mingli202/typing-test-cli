@@ -17,13 +17,3 @@ pub fn view_bottom_menu(lines: &[&str], area: Rect, buf: &mut Buffer) {
 
     text.render(menu_area, buf);
 }
-
-/// To compute the blinking cursor
-pub fn should_draw_cursor() -> bool {
-    let t = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(n) => n.as_secs(),
-        Err(_) => 0,
-    };
-
-    t % 2 == 0
-}
