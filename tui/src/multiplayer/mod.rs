@@ -30,13 +30,13 @@ pub enum GameStatus {
     Waiting,
     Countdown(i8),
     Playing,
+    Done,
     End,
 }
 
 pub struct Lobby {
     lobby_info: LobbyInfo,
     typing: Typing,
-    done: bool,
 }
 
 #[derive(Default)]
@@ -184,7 +184,11 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                     let mut lock = model.game_model.write().unwrap();
                     if let Some(lobby) = &mut lock.lobby {
                         let done = lobby.typing.on_type(c);
-                        lobby.done = done;
+
+                        if done {
+                            send_update_stats(model, lobby);
+                            lock.game_status = Some(GameStatus::Done);
+                        }
                     }
                 }
             }
@@ -205,24 +209,32 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                 }
             }
             KeyCode::Enter => {
-                let is_leader = {
+                let can_start = {
                     let lock = model.game_model.read().unwrap();
 
-                    let mut is_leader = false;
-
-                    if let Some(ref players) = lock.players_info
+                    let is_leader = if let Some(ref players) = lock.players_info
                         && let Some(ref user_id) = lock.user_id
                     {
-                        is_leader = players
+                        players
                             .players
                             .get(user_id)
-                            .is_some_and(|player| player.is_leader);
-                    }
+                            .is_some_and(|player| player.is_leader)
+                    } else {
+                        false
+                    };
 
-                    is_leader
+                    let is_waiting = if let Some(ref game_status) = lock.game_status
+                        && (*game_status == GameStatus::Waiting || *game_status == GameStatus::End)
+                    {
+                        true
+                    } else {
+                        false
+                    };
+
+                    is_leader && is_waiting
                 };
 
-                if is_leader {
+                if can_start {
                     model.send_msg(WsMsg::StartGame);
                 }
             }
@@ -231,18 +243,11 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
         Msg::Tick => {
             if model.last_sent_update.elapsed() > Duration::from_millis(200) {
                 let lock = model.game_model.read().unwrap();
+
                 if lock.game_status == Some(GameStatus::Playing)
                     && let Some(ref lobby) = lock.lobby
                 {
-                    let wpm = lobby.typing.net_wpm();
-                    let mut progress =
-                        lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
-
-                    if progress > 100 {
-                        progress = 100;
-                    }
-
-                    model.send_msg(WsMsg::UpdateStats(wpm, progress as u8));
+                    send_update_stats(model, lobby);
                 }
 
                 model.last_sent_update = Instant::now();
@@ -252,6 +257,18 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
     };
 
     None
+}
+
+// Sends the user's stats to the server
+fn send_update_stats(model: &MultiplayerModel, lobby: &Lobby) {
+    let wpm = lobby.typing.net_wpm();
+    let mut progress = lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
+
+    if progress > 100 {
+        progress = 100;
+    }
+
+    model.send_msg(WsMsg::UpdateStats(wpm, progress as u8));
 }
 
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
@@ -339,7 +356,12 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                 view_players(players, user_id, max_offset, area, buf);
             }
 
-            view_typing_test(&lobby.typing, data_area, buf);
+            if let Some(ref game_status) = lock.game_status
+                && *game_status == GameStatus::Done
+            {
+            } else {
+                view_typing_test(&lobby.typing, data_area, buf);
+            }
 
             view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Leave <Esc>"], area, buf);
         }
@@ -354,6 +376,7 @@ fn view_game_status(
     buf: &mut Buffer,
 ) -> Rect {
     let txt = match game_status {
+        GameStatus::Done => line!("Waiting for others to finish..."),
         GameStatus::Waiting => {
             if is_leader {
                 line!("Press ENTER to start")
@@ -361,12 +384,8 @@ fn view_game_status(
                 line!("Waiting for leader")
             }
         }
-        GameStatus::Countdown(count_down) => {
-            line!("Start in ", count_down.to_span())
-        }
-        GameStatus::Playing => {
-            line!("Go!")
-        }
+        GameStatus::Countdown(count_down) => line!("Start in ", count_down.to_span()),
+        GameStatus::Playing => line!("Go!"),
         GameStatus::End => {
             if is_leader {
                 line!("Game has ended, press ENTER to restart")
