@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use itertools::Itertools;
 use ratatui::macros::line;
