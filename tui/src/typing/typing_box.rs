@@ -7,8 +7,6 @@ use ratatui::style::{Color, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Paragraph, Widget};
 
-use crate::util::view_helpers;
-
 use super::letter::{Letter, TypedState};
 use super::word::Word;
 
