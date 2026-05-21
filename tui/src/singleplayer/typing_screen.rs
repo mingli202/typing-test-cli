@@ -122,7 +122,6 @@ pub fn update(
         }
         Msg::FocusGained => *is_focused = true,
         Msg::FocusLost => *is_focused = false,
-        _ => {}
     };
 
     None

@@ -725,6 +725,7 @@ mod test {
             write_tx,
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
+            is_focused: true,
         };
 
         // Act
@@ -789,6 +790,7 @@ mod test {
             write_tx,
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
+            is_focused: true,
         };
 
         let lobby_info = LobbyInfo {
