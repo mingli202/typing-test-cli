@@ -353,8 +353,8 @@ fn split_into_lines(typing_test: &Typing, is_focused: bool, max_width: usize) ->
         letters.push(Span::raw(" "));
 
         // draw cursor
-        if is_focused && view_helpers::should_draw_cursor() && typing_test.word_index == i {
-            if let Some(letter) = letters.get_mut(typing_test.letter_index) {
+        if typing_test.word_index == i {
+            if is_focused && let Some(letter) = letters.get_mut(typing_test.letter_index) {
                 *letter = letter.clone().fg(Color::Black).bg(Color::White);
             }
 

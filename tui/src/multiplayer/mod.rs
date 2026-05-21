@@ -285,7 +285,7 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
     match lock.lobby {
         None => {
             let lobby_text: String = model.input_lobby_id.iter().collect();
-            let cursor = span![" "].bg(if view_helpers::should_draw_cursor() {
+            let cursor = span![" "].bg(if model.is_focused {
                 Color::White
             } else {
                 Color::Reset
