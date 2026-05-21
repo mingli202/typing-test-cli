@@ -9,7 +9,7 @@ use crate::multiplayer::{self, MultiplayerModel};
 use crate::singleplayer::SinglePlayerModel;
 use crate::util::config::{Config, ConfigUpdate};
 use crate::util::data_provider::DataProvider;
-use crate::util::toast::{self, Toast};
+use crate::util::toast::{self, Toast, ToastAction};
 use crate::{CustomEvent, singleplayer};
 
 pub enum Screen {
@@ -53,47 +53,40 @@ impl AppModel {
 
 pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
     match msg {
-        Msg::ToastAction(action) => model.toast.handle_action(action),
-        _ => {
-            match msg {
-                Msg::Key(KeyEvent {
-                    code: KeyCode::Char('c'),
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                }) => {
-                    return Some(Action::Quit);
-                }
-                Msg::Key(KeyEvent {
-                    code: KeyCode::Char('p'),
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                }) => {
-                    if let Screen::SinglePlayer(_) = model.screen {
-                        return Some(Action::SwitchScreen(Screen::Multiplayer(
-                            MultiplayerModel::new(model.event_tx.clone()),
-                        )));
-                    } else {
-                        return Some(Action::SwitchToSinglePlayer);
-                    }
-                }
-                _ => {}
-            }
-
-            return match &mut model.screen {
-                Screen::SinglePlayer(singleplayer_model) => singleplayer::update(
-                    singleplayer_model,
-                    &model.data_provider,
-                    model.args.no_error,
-                    msg,
-                ),
-                Screen::Multiplayer(multiplayer_model) => {
-                    multiplayer::update(multiplayer_model, &model.event_tx, msg)
-                }
-            };
+        Msg::Key(KeyEvent {
+            code: KeyCode::Char('c'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        }) => {
+            return Some(Action::Quit);
         }
-    };
+        Msg::Key(KeyEvent {
+            code: KeyCode::Char('p'),
+            modifiers: KeyModifiers::CONTROL,
+            ..
+        }) => {
+            if let Screen::SinglePlayer(_) = model.screen {
+                return Some(Action::SwitchScreen(Screen::Multiplayer(
+                    MultiplayerModel::new(model.event_tx.clone()),
+                )));
+            } else {
+                return Some(Action::SwitchToSinglePlayer);
+            }
+        }
+        _ => {}
+    }
 
-    None
+    match &mut model.screen {
+        Screen::SinglePlayer(singleplayer_model) => singleplayer::update(
+            singleplayer_model,
+            &model.data_provider,
+            model.args.no_error,
+            msg,
+        ),
+        Screen::Multiplayer(multiplayer_model) => {
+            multiplayer::update(multiplayer_model, &model.event_tx, msg)
+        }
+    }
 }
 
 pub fn view(model: &AppModel, frame: &mut Frame) {
@@ -128,6 +121,13 @@ pub fn handle_action(model: &mut AppModel, action: Action) -> Option<Action> {
             model.config.handle_config_update(ConfigUpdate::Mode(mode));
         }
     };
+
+    None
+}
+
+/// Separate toast action handler instead of msg
+pub fn handle_toast_action(model: &mut AppModel, toast_action: ToastAction) -> Option<Action> {
+    model.toast.handle_action(toast_action);
 
     None
 }

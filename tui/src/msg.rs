@@ -5,7 +5,6 @@ use crate::util::toast::ToastAction;
 pub enum Msg {
     Tick,
     Key(KeyEvent),
-    ToastAction(ToastAction),
     FocusGained,
     FocusLost,
 }

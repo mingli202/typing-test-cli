@@ -9,7 +9,7 @@ use tokio::time::interval;
 
 use self::action::Action;
 use self::args::Args;
-use self::model::{AppModel, handle_action, update, view};
+use self::model::{AppModel, handle_action, handle_toast_action, update, view};
 use self::msg::Msg;
 use self::util::toast::ToastAction;
 
@@ -49,7 +49,7 @@ pub async fn run(terminal: &mut DefaultTerminal, args: Args) -> color_eyre::Resu
                         None
                     }
                     CustomEvent::Key(key) => update(&mut app_model, Msg::Key(key)),
-                    CustomEvent::ToastAction(action) => update(&mut app_model, Msg::ToastAction(action)),
+                    CustomEvent::ToastAction(action) => handle_toast_action(&mut app_model, action),
                     CustomEvent::FocusGained => update(&mut app_model, Msg::FocusGained),
                     CustomEvent::FocusLost => update(&mut app_model, Msg::FocusLost),
                 }
