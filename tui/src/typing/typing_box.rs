@@ -1,11 +1,13 @@
 use std::fmt::Display;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
 use ratatui::macros::line;
 use ratatui::style::{Color, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Paragraph, Widget};
+
+use crate::util::view_helpers;
 
 use super::letter::{Letter, TypedState};
 use super::word::Word;
@@ -335,7 +337,7 @@ impl Display for Typing {
 }
 
 /// Returns text representation and cursorline index
-fn split_into_lines(typing_test: &Typing, max_width: usize) -> (Text<'_>, usize) {
+fn split_into_lines(typing_test: &Typing, is_focused: bool, max_width: usize) -> (Text<'_>, usize) {
     let mut lines: Vec<Line> = vec![];
     let mut current_line: Line = line![];
     let mut cursor_index = 0;
@@ -351,7 +353,7 @@ fn split_into_lines(typing_test: &Typing, max_width: usize) -> (Text<'_>, usize)
         letters.push(Span::raw(" "));
 
         // draw cursor
-        if typing_test.word_index == i {
+        if is_focused && view_helpers::should_draw_cursor() && typing_test.word_index == i {
             if let Some(letter) = letters.get_mut(typing_test.letter_index) {
                 *letter = letter.clone().fg(Color::Black).bg(Color::White);
             }
@@ -384,10 +386,11 @@ fn split_into_lines(typing_test: &Typing, max_width: usize) -> (Text<'_>, usize)
 
 pub fn view_typing_test(
     typing_test: &Typing,
+    is_focused: bool,
     area: ratatui::prelude::Rect,
     buf: &mut ratatui::prelude::Buffer,
 ) {
-    let (text, cursor_index) = split_into_lines(typing_test, area.width as usize);
+    let (text, cursor_index) = split_into_lines(typing_test, is_focused, area.width as usize);
 
     let offset = if cursor_index == 0 {
         0

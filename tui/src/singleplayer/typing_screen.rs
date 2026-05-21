@@ -27,6 +27,7 @@ pub struct TypingModel {
     stats_last_updated_time: Instant,
     stats: TypingStats,
     selected_mode: ModeSelection,
+    is_focused: bool,
 }
 
 impl TypingModel {
@@ -36,6 +37,7 @@ impl TypingModel {
             stats_last_updated_time: Instant::now(),
             stats: TypingStats::default(),
             selected_mode: ModeSelection::new(initial_mode),
+            is_focused: true,
         }
     }
 }
@@ -50,6 +52,7 @@ pub fn update(
         stats_last_updated_time,
         stats,
         selected_mode,
+        is_focused,
     } = typing_model;
 
     match msg {
@@ -117,6 +120,8 @@ pub fn update(
                 stats.elapsed = elapsed
             }
         }
+        Msg::FocusGained => *is_focused = true,
+        Msg::FocusLost => *is_focused = false,
         _ => {}
     };
 
@@ -158,7 +163,12 @@ fn handle_arrow_keys(
 /// Main view function for typing test screen
 pub fn view(typing_model: &TypingModel, shared_model: &SharedModel, area: Rect, buf: &mut Buffer) {
     let typing_test_area = area.centered_vertically(Constraint::Length(3));
-    typing::view_typing_test(&typing_model.typing, typing_test_area, buf);
+    typing::view_typing_test(
+        &typing_model.typing,
+        typing_model.is_focused,
+        typing_test_area,
+        buf,
+    );
 
     view_stats(
         &typing_model.stats,

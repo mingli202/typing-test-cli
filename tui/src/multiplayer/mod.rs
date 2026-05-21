@@ -60,6 +60,7 @@ pub struct MultiplayerModel {
     write_tx: UnboundedSender<String>,
     input_lobby_id: Vec<char>,
     last_sent_update: Instant,
+    is_focused: bool,
 
     cancel_token: CancellationToken,
 }
@@ -71,9 +72,10 @@ impl MultiplayerModel {
         let model = MultiplayerModel {
             game_model: Arc::new(RwLock::new(GameModel::default())),
             write_tx,
-            cancel_token: CancellationToken::new(),
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
+            is_focused: true,
+            cancel_token: CancellationToken::new(),
         };
 
         let game_model = Arc::clone(&model.game_model);
@@ -127,6 +129,12 @@ pub fn update(
             ToastMessage::error("Multiplayer crashed, back to singleplayer".to_string()),
         );
         return Some(crate::action::Action::SwitchToSinglePlayer);
+    }
+
+    match msg {
+        Msg::FocusGained => model.is_focused = true,
+        Msg::FocusLost => model.is_focused = false,
+        _ => {}
     }
 
     if is_in_lobby {
@@ -276,13 +284,8 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
 
     match lock.lobby {
         None => {
-            let t = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                Ok(n) => n.as_secs(),
-                Err(_) => 0,
-            };
-
             let lobby_text: String = model.input_lobby_id.iter().collect();
-            let cursor = span![" "].bg(if t % 2 == 0 {
+            let cursor = span![" "].bg(if view_helpers::should_draw_cursor() {
                 Color::White
             } else {
                 Color::Reset
@@ -360,7 +363,7 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                 && *game_status == GameStatus::Done
             {
             } else {
-                view_typing_test(&lobby.typing, data_area, buf);
+                view_typing_test(&lobby.typing, model.is_focused, data_area, buf);
             }
 
             view_helpers::view_bottom_menu(&["Singleplayer <C-p>  Leave <Esc>"], area, buf);
