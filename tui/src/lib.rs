@@ -28,6 +28,8 @@ pub enum CustomEvent {
     Render,
     Key(KeyEvent),
     ToastAction(ToastAction),
+    FocusGained,
+    FocusLost,
 }
 
 pub async fn run(terminal: &mut DefaultTerminal, args: Args) -> color_eyre::Result<()> {
@@ -48,6 +50,8 @@ pub async fn run(terminal: &mut DefaultTerminal, args: Args) -> color_eyre::Resu
                     }
                     CustomEvent::Key(key) => update(&mut app_model, Msg::Key(key)),
                     CustomEvent::ToastAction(action) => update(&mut app_model, Msg::ToastAction(action)),
+                    CustomEvent::FocusGained => update(&mut app_model, Msg::FocusGained),
+                    CustomEvent::FocusLost => update(&mut app_model, Msg::FocusLost),
                 }
 
             },
@@ -84,6 +88,8 @@ fn init_event_loop(event_tx: UnboundedSender<CustomEvent>, fps: usize, tps: usiz
                         Some(Ok(e)) => {
                             match e {
                                 Event::Key(key_event) if key_event.kind == KeyEventKind::Press => CustomEvent::Key(key_event),
+                                Event::FocusGained => CustomEvent::FocusGained,
+                                Event::FocusLost => CustomEvent::FocusLost,
                                 _ => continue,
                             }
                         }
