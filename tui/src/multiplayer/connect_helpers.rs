@@ -151,6 +151,8 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
             lock.lobby = Some(Lobby {
                 typing: Typing::new(&lobby_info.data.text).stop_on_error(true),
                 lobby_info,
+                section_wpm: vec![],
+                last_section_taken: (None, 0),
             });
             lock.active_lobby_id = Some(lobby_id.clone());
             lock.game_status = Some(GameStatus::Waiting);
@@ -171,6 +173,8 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
             if let Some(lobby) = &mut lock.lobby {
                 lobby.typing = Typing::new(&new_game.data.text).stop_on_error(true);
                 lobby.lobby_info.data = new_game.data;
+                lobby.section_wpm = vec![];
+                lobby.last_section_taken = (None, 0);
             }
             lock.players_info = Some(new_game.players_info)
         }
@@ -729,8 +733,6 @@ mod test {
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
             is_focused: true,
-            section_wpm: vec![],
-            last_section_taken: (None, 0),
         };
 
         // Act
@@ -796,8 +798,6 @@ mod test {
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
             is_focused: true,
-            section_wpm: vec![],
-            last_section_taken: (None, 0),
         };
 
         let lobby_info = LobbyInfo {

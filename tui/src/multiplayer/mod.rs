@@ -39,6 +39,10 @@ pub enum GameStatus {
 pub struct Lobby {
     lobby_info: LobbyInfo,
     typing: Typing,
+
+    section_wpm: Vec<(f64, f64)>,
+    /// the time the last section was taken, and the number of characters typed at that point in time
+    last_section_taken: (Option<Instant>, usize),
 }
 
 #[derive(Default)]
@@ -63,9 +67,6 @@ pub struct MultiplayerModel {
     input_lobby_id: Vec<char>,
     last_sent_update: Instant,
     is_focused: bool,
-    section_wpm: Vec<(f64, f64)>,
-    /// the time the last section was taken, and the number of characters typed at that point in time
-    last_section_taken: (Option<Instant>, usize),
 
     cancel_token: CancellationToken,
 }
@@ -80,8 +81,6 @@ impl MultiplayerModel {
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
             is_focused: true,
-            section_wpm: vec![],
-            last_section_taken: (None, 0),
             cancel_token: CancellationToken::new(),
         };
 
@@ -203,21 +202,21 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                         let section = typing_progress(lobby) / 10;
 
                         if section > 0
-                            && model.section_wpm.len() < section
+                            && lobby.section_wpm.len() < section
                             && let Some(elapsed) = lobby.typing.elapsed_since_start_sec()
                         {
                             let elapsed_since_last_section =
-                                model.last_section_taken.0.map_or(elapsed, |t| t.elapsed());
+                                lobby.last_section_taken.0.map_or(elapsed, |t| t.elapsed());
 
                             let letters_typed = lobby.typing.letters_typed();
                             let letters_typed_since_last_section =
-                                letters_typed.saturating_sub(model.last_section_taken.1);
+                                letters_typed.saturating_sub(lobby.last_section_taken.1);
 
                             let wpm = 60.0 * (letters_typed_since_last_section as f64 / 5.0)
                                 / elapsed_since_last_section.as_secs_f64();
 
-                            model.section_wpm.push(((section * 10) as f64, wpm));
-                            model.last_section_taken = (Some(Instant::now()), letters_typed);
+                            lobby.section_wpm.push(((section * 10) as f64, wpm));
+                            lobby.last_section_taken = (Some(Instant::now()), letters_typed);
                         }
 
                         if done {
@@ -418,7 +417,7 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                     height: graph_area_height,
                 });
                 let wpm = lobby.typing.net_wpm();
-                view_section_wpm(&model.section_wpm, wpm, graph_area, buf);
+                view_section_wpm(&lobby.section_wpm, wpm, graph_area, buf);
             } else {
                 view_typing_test(&lobby.typing, model.is_focused, data_area, buf);
             }
