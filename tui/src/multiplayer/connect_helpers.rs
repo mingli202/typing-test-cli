@@ -211,6 +211,9 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
         "StartGame" => {
             let mut lock = game_model.write().unwrap();
             lock.game_status = Some(GameStatus::Playing);
+            if let Some(ref mut lobby) = lock.lobby {
+                lobby.typing.start();
+            }
         }
         _ => return Err(format!("cmd {} unsupported", cmd)),
     };
