@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use crossterm::event::{KeyCode, KeyModifiers};
 use itertools::Itertools;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect, Size};
+use ratatui::layout::{Constraint, Direction, HorizontalAlignment, Layout, Offset, Rect, Size};
 use ratatui::macros::{line, span};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::symbols::{self, Marker};
@@ -391,7 +391,27 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             if let Some(ref game_status) = lock.game_status
                 && (*game_status == GameStatus::Done || *game_status == GameStatus::End)
             {
-                let graph_area_height = area.height.saturating_sub(data_area.y).saturating_sub(3);
+                let data_source =
+                    Paragraph::new(format!("Source: {}", &lobby.lobby_info.data.source))
+                        .wrap(Wrap { trim: true });
+                let data_source_line_count = data_source.line_count(data_area.width);
+                let mut data_source_area = data_area.resize(Size {
+                    width: data_area.width,
+                    height: data_source_line_count as u16,
+                });
+                data_source_area.y = area.bottom().saturating_sub(2);
+
+                let data_source_area = data_source_area.offset(Offset {
+                    x: 0,
+                    y: -(data_source_line_count as i32),
+                });
+                data_source.render(data_source_area, buf);
+
+                let graph_area_height = area
+                    .height
+                    .saturating_sub(data_area.y)
+                    .saturating_sub(3)
+                    .saturating_sub(data_source_area.height);
                 let graph_area = data_area.resize(Size {
                     width: data_area.width,
                     height: graph_area_height,
@@ -548,7 +568,11 @@ fn view_section_wpm(section_wpm: &[(f64, f64)], area: Rect, buf: &mut Buffer) {
 
     // Create the chart and link all the parts together
     let chart = Chart::new(datasets)
-        .block(Block::new().title("Section WPM"))
+        .block(
+            Block::new()
+                .title("WPM per section")
+                .title_alignment(HorizontalAlignment::Center),
+        )
         .x_axis(x_axis)
         .y_axis(y_axis);
 
