@@ -416,7 +416,8 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
                     width: data_area.width,
                     height: graph_area_height,
                 });
-                view_section_wpm(&model.section_wpm, graph_area, buf);
+                let wpm = lobby.typing.net_wpm();
+                view_section_wpm(&model.section_wpm, wpm, graph_area, buf);
             } else {
                 view_typing_test(&lobby.typing, model.is_focused, data_area, buf);
             }
@@ -530,8 +531,15 @@ fn view_player(player: &PlayerInfo, is_me: bool, area: Rect, buf: &mut Buffer) {
 }
 
 /// Renders the wpm per section when the user is done with the test
-fn view_section_wpm(section_wpm: &[(f64, f64)], area: Rect, buf: &mut Buffer) {
+fn view_section_wpm(section_wpm: &[(f64, f64)], net_wpm: f64, area: Rect, buf: &mut Buffer) {
+    let net_wpm_line = [(0.0, net_wpm), (100.0, net_wpm)];
+
     let datasets = vec![
+        Dataset::default()
+            .graph_type(GraphType::Line)
+            .style(Style::default().dark_gray())
+            .marker(Marker::Quadrant)
+            .data(&net_wpm_line),
         Dataset::default()
             .graph_type(GraphType::Bar)
             .style(Style::default().white())
@@ -553,24 +561,24 @@ fn view_section_wpm(section_wpm: &[(f64, f64)], area: Rect, buf: &mut Buffer) {
         .unwrap_or(0);
 
     // Make the graph go to 1 if it's less for prettier graph
-    let max_wpm = if max_wpm <= 1 { 1.0 } else { max_wpm as f64 };
+    let max_wpm = if max_wpm <= 1 { 1 } else { max_wpm };
 
     // Create the Y axis and define its properties
     let y_axis = Axis::default()
         .title("WPM")
         .style(Style::default().white())
-        .bounds([0.0, max_wpm])
+        .bounds([0.0, max_wpm as f64])
         .labels([
             "0.0".to_string(),
-            format!("{:.1}", max_wpm / 2.0),
-            format!("{:.1}", max_wpm),
+            format!("{}", max_wpm / 2),
+            format!("{}", max_wpm),
         ]);
 
     // Create the chart and link all the parts together
     let chart = Chart::new(datasets)
         .block(
             Block::new()
-                .title("WPM per section")
+                .title(format!("WPM per section ({:.1} net wpm)", net_wpm))
                 .title_alignment(HorizontalAlignment::Center),
         )
         .x_axis(x_axis)
