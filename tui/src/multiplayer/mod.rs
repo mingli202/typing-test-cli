@@ -209,14 +209,15 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                             let elapsed_since_last_section =
                                 model.last_section_taken.0.map_or(elapsed, |t| t.elapsed());
 
-                            let n = lobby
-                                .typing
-                                .letters_typed()
-                                .saturating_sub(model.last_section_taken.1);
+                            let letters_typed = lobby.typing.letters_typed();
+                            let letters_typed_since_last_section =
+                                letters_typed.saturating_sub(model.last_section_taken.1);
 
-                            let wpm =
-                                60.0 * (n as f64 / 5.0) / elapsed_since_last_section.as_secs_f64();
+                            let wpm = 60.0 * (letters_typed_since_last_section as f64 / 5.0)
+                                / elapsed_since_last_section.as_secs_f64();
+
                             model.section_wpm.push(((section * 10) as f64, wpm));
+                            model.last_section_taken = (Some(Instant::now()), letters_typed);
                         }
 
                         if done {
