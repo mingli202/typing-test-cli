@@ -7,9 +7,11 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Offset, Rect, Size};
 use ratatui::macros::{line, span};
 use ratatui::style::{Color, Style, Stylize};
-use ratatui::symbols;
+use ratatui::symbols::{self, Marker};
 use ratatui::text::ToSpan;
-use ratatui::widgets::{Block, LineGauge, Paragraph, Widget, Wrap};
+use ratatui::widgets::{
+    Axis, Block, Chart, Dataset, GraphType, LineGauge, Paragraph, Widget, Wrap,
+};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
@@ -61,6 +63,9 @@ pub struct MultiplayerModel {
     input_lobby_id: Vec<char>,
     last_sent_update: Instant,
     is_focused: bool,
+    section_wpm: Vec<(f64, f64)>,
+    /// the time the last section was taken, and the number of characters typed at that point in time
+    last_section_taken: (Option<Instant>, usize),
 
     cancel_token: CancellationToken,
 }
@@ -75,6 +80,8 @@ impl MultiplayerModel {
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
             is_focused: true,
+            section_wpm: vec![],
+            last_section_taken: (None, 0),
             cancel_token: CancellationToken::new(),
         };
 
@@ -193,6 +200,25 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                     if let Some(lobby) = &mut lock.lobby {
                         let done = lobby.typing.on_type(c);
 
+                        let section = typing_progress(lobby) / 10;
+
+                        if section > 0
+                            && model.section_wpm.len() < section
+                            && let Some(elapsed) = lobby.typing.elapsed_since_start_sec()
+                        {
+                            let elapsed_since_last_section =
+                                model.last_section_taken.0.map_or(elapsed, |t| t.elapsed());
+
+                            let n = lobby
+                                .typing
+                                .letters_typed()
+                                .saturating_sub(model.last_section_taken.1);
+
+                            let wpm =
+                                60.0 * (n as f64 / 5.0) / elapsed_since_last_section.as_secs_f64();
+                            model.section_wpm.push(((section * 10) as f64, wpm));
+                        }
+
                         if done {
                             send_update_stats(model, lobby);
                             lock.game_status = Some(GameStatus::Done);
@@ -270,13 +296,16 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
 // Sends the user's stats to the server
 fn send_update_stats(model: &MultiplayerModel, lobby: &Lobby) {
     let wpm = lobby.typing.net_wpm();
-    let mut progress = lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
-
-    if progress > 100 {
-        progress = 100;
-    }
+    let progress = typing_progress(lobby);
 
     model.send_msg(WsMsg::UpdateStats(wpm, progress as u8));
+}
+
+// Get the progress
+fn typing_progress(lobby: &Lobby) -> usize {
+    let progress = lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
+
+    if progress > 100 { 100 } else { progress }
 }
 
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
@@ -360,8 +389,14 @@ pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
             }
 
             if let Some(ref game_status) = lock.game_status
-                && *game_status == GameStatus::Done
+                && (*game_status == GameStatus::Done || *game_status == GameStatus::End)
             {
+                let graph_area_height = area.height.saturating_sub(data_area.y).saturating_sub(3);
+                let graph_area = data_area.resize(Size {
+                    width: data_area.width,
+                    height: graph_area_height,
+                });
+                view_section_wpm(&model.section_wpm, graph_area, buf);
             } else {
                 view_typing_test(&lobby.typing, model.is_focused, data_area, buf);
             }
@@ -455,6 +490,7 @@ fn view_players(
     }
 }
 
+/// Render a player with their name, wpm, and progess bar
 fn view_player(player: &PlayerInfo, is_me: bool, area: Rect, buf: &mut Buffer) {
     let ratio = player.progress_percent as f64 / 100.0;
 
@@ -471,4 +507,50 @@ fn view_player(player: &PlayerInfo, is_me: bool, area: Rect, buf: &mut Buffer) {
         .unfilled_symbol(" ")
         .ratio(ratio.clamp(0.0, 1.0))
         .render(area, buf)
+}
+
+/// Renders the wpm per section when the user is done with the test
+fn view_section_wpm(section_wpm: &[(f64, f64)], area: Rect, buf: &mut Buffer) {
+    let datasets = vec![
+        Dataset::default()
+            .graph_type(GraphType::Bar)
+            .style(Style::default().white())
+            .marker(Marker::Quadrant)
+            .data(section_wpm),
+    ];
+
+    // Create the X axis and define its properties
+    let x_axis = Axis::default()
+        .title("Section (%)")
+        .style(Style::default().white())
+        .bounds([0.0, 100.0])
+        .labels(["0", "50", "100"]);
+
+    let max_wpm = section_wpm
+        .iter()
+        .map(|(_, wpm)| wpm.ceil() as i32)
+        .max()
+        .unwrap_or(0);
+
+    // Make the graph go to 1 if it's less for prettier graph
+    let max_wpm = if max_wpm <= 1 { 1.0 } else { max_wpm as f64 };
+
+    // Create the Y axis and define its properties
+    let y_axis = Axis::default()
+        .title("WPM")
+        .style(Style::default().white())
+        .bounds([0.0, max_wpm])
+        .labels([
+            "0.0".to_string(),
+            format!("{:.1}", max_wpm / 2.0),
+            format!("{:.1}", max_wpm),
+        ]);
+
+    // Create the chart and link all the parts together
+    let chart = Chart::new(datasets)
+        .block(Block::new().title("Section WPM"))
+        .x_axis(x_axis)
+        .y_axis(y_axis);
+
+    chart.render(area, buf);
 }

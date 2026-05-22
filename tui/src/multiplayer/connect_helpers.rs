@@ -729,6 +729,8 @@ mod test {
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
             is_focused: true,
+            section_wpm: vec![],
+            last_section_taken: (None, 0),
         };
 
         // Act
@@ -794,6 +796,8 @@ mod test {
             input_lobby_id: vec![],
             last_sent_update: Instant::now(),
             is_focused: true,
+            section_wpm: vec![],
+            last_section_taken: (None, 0),
         };
 
         let lobby_info = LobbyInfo {
