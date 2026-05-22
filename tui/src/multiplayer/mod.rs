@@ -547,12 +547,12 @@ fn view_section_wpm(section_wpm: &[(f64, f64)], net_wpm: f64, area: Rect, buf: &
         Dataset::default()
             .graph_type(GraphType::Line)
             .style(Style::default().dark_gray())
-            .marker(Marker::Quadrant)
+            .marker(Marker::Braille)
             .data(&net_wpm_line),
         Dataset::default()
             .graph_type(GraphType::Bar)
             .style(Style::default().white())
-            .marker(Marker::Quadrant)
+            .marker(Marker::HalfBlock)
             .data(section_wpm),
     ];
 
