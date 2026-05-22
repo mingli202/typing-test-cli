@@ -515,7 +515,7 @@ fn view_players(
 fn view_player(player: &PlayerInfo, is_me: bool, area: Rect, buf: &mut Buffer) {
     let ratio = player.progress_percent as f64 / 100.0;
 
-    let mut label = span!(format!("{} {}", player.name, player.wpm));
+    let mut label = span!(format!("{} {:.1}", player.name, player.wpm));
 
     if is_me {
         label = label.underlined();
