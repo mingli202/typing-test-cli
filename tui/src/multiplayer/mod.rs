@@ -579,7 +579,7 @@ fn view_section_wpm(section_wpm: &[(f64, f64)], net_wpm: f64, area: Rect, buf: &
     let chart = Chart::new(datasets)
         .block(
             Block::new()
-                .title(format!("WPM per section ({:.1} net wpm)", net_wpm))
+                .title(format!("WPM per section ({:.1} net WPM)", net_wpm))
                 .title_alignment(HorizontalAlignment::Center),
         )
         .x_axis(x_axis)
