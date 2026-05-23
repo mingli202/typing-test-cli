@@ -81,15 +81,10 @@ impl Typing {
         } else {
             self.add_letter_to_current_word(c);
 
-            let curr_word = &mut self.words[self.word_index];
-            let word_len = curr_word.letters_len();
-
-            let is_last_word_error = curr_word.is_error();
-            let is_at_last_letter_of_last_word =
-                self.word_index >= self.words.len() - 1 && self.letter_index >= word_len - 1;
+            let is_done = self.on_type_end();
 
             self.letter_index += 1;
-            is_at_last_letter_of_last_word && !is_last_word_error
+            is_done
         };
 
         if is_done {
@@ -100,6 +95,18 @@ impl Typing {
         }
 
         is_done
+    }
+
+    /// Whether typing the character ends the typing test
+    fn on_type_end(&self) -> bool {
+        let curr_word = &self.words[self.word_index];
+        let word_len = curr_word.letters_len();
+
+        let is_last_word_error = curr_word.is_error();
+        let is_at_last_letter_of_last_word =
+            self.word_index >= self.words.len() - 1 && self.letter_index >= word_len - 1;
+
+        is_at_last_letter_of_last_word && !is_last_word_error
     }
 
     /// adds the given letter ot the current word
