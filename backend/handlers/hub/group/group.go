@@ -166,7 +166,10 @@ func (group *Group) UpdateStats(u *user.User, wpm float64, progressPercent uint8
 
 	if p, ok := group.playerInfo[u.Id()]; ok {
 		p.Wpm = wpm
-		p.ProgressPercent = progressPercent
+
+		if progressPercent > p.ProgressPercent {
+			p.ProgressPercent = progressPercent
+		}
 
 		group.playerInfoVersion += 1
 
