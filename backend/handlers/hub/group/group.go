@@ -500,7 +500,7 @@ func (group *Group) canUserStartGame(u *user.User) error {
 func (group *Group) newNameLocked() string {
 	name, _ := group.nameProvider.NewName()
 
-	if group.dataProvider.HasLessThan2Quotes() {
+	if group.nameProvider.LessThan2NounsOrAdjectives() {
 		return name
 	}
 
