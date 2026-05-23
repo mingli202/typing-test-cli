@@ -167,9 +167,14 @@ fn update_no_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate:
 
                     model.input_lobby_id.push(c);
                 }
-                KeyCode::Backspace => {
-                    model.input_lobby_id.pop();
-                }
+                KeyCode::Backspace => match key.modifiers {
+                    KeyModifiers::CONTROL | KeyModifiers::ALT => {
+                        model.input_lobby_id.clear();
+                    }
+                    _ => {
+                        model.input_lobby_id.pop();
+                    }
+                },
                 KeyCode::Enter => {
                     let lobby_id = model.input_lobby_id.iter().collect();
                     model.send_msg(WsMsg::JoinGroup(lobby_id));
