@@ -44,7 +44,16 @@ pub struct Typing {
 impl Typing {
     /// Creates a new TypingTest with the given &str
     pub fn new(text: &str) -> Self {
-        let words: Vec<Word> = text.split(" ").map(Word::new).collect();
+        let split: Vec<&str> = text.split(" ").filter(|w| !w.is_empty()).collect();
+
+        let words: Vec<Word> = if split.is_empty() {
+            "The provided text was emtpy, using this as default."
+                .split(" ")
+                .map(Word::new)
+                .collect()
+        } else {
+            split.iter().map(|w| Word::new(w)).collect()
+        };
 
         Typing {
             word_index: 0,
