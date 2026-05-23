@@ -208,15 +208,19 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                             let elapsed_since_last_section =
                                 lobby.last_section_taken.0.map_or(elapsed, |t| t.elapsed());
 
-                            let letters_typed = lobby.typing.letters_typed();
-                            let letters_typed_since_last_section =
-                                letters_typed.saturating_sub(lobby.last_section_taken.1);
+                            let elapsed_secs = elapsed_since_last_section.as_secs_f64();
 
-                            let wpm = 60.0 * (letters_typed_since_last_section as f64 / 5.0)
-                                / elapsed_since_last_section.as_secs_f64();
+                            if elapsed_secs > 0.0 {
+                                let letters_typed = lobby.typing.letters_typed();
+                                let letters_typed_since_last_section =
+                                    letters_typed.saturating_sub(lobby.last_section_taken.1);
 
-                            lobby.section_wpm.push(((section * 10) as f64, wpm));
-                            lobby.last_section_taken = (Some(Instant::now()), letters_typed);
+                                let wpm = 60.0 * (letters_typed_since_last_section as f64 / 5.0)
+                                    / elapsed_secs;
+
+                                lobby.section_wpm.push(((section * 10) as f64, wpm));
+                                lobby.last_section_taken = (Some(Instant::now()), letters_typed);
+                            }
                         }
 
                         if done {
@@ -303,7 +307,13 @@ fn send_update_stats(model: &MultiplayerModel, lobby: &Lobby) {
 
 /// Get the progress
 fn typing_progress(lobby: &Lobby) -> usize {
-    let progress = lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
+    let total_len = lobby.lobby_info.data.text.len();
+
+    if total_len == 0 {
+        return 100;
+    }
+
+    let progress = lobby.typing.letters_typed() * 100 / total_len;
 
     if progress > 100 { 100 } else { progress }
 }
