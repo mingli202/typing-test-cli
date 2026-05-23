@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Offset, Rect};
 use ratatui::macros::line;
@@ -75,9 +75,14 @@ pub fn update(
                     });
                 }
             }
-            KeyCode::Backspace => {
-                typing_test.on_backspace();
-            }
+            KeyCode::Backspace => match key.modifiers {
+                KeyModifiers::CONTROL | KeyModifiers::ALT => {
+                    typing_test.on_ctrl_backspace();
+                }
+                _ => {
+                    typing_test.on_backspace();
+                }
+            },
             KeyCode::Tab => {
                 return Some(Action::NewTypingScreen);
             }

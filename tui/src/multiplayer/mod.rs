@@ -247,7 +247,14 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
                 if is_playing {
                     let mut lock = model.game_model.write().unwrap();
                     if let Some(lobby) = &mut lock.lobby {
-                        lobby.typing.on_backspace();
+                        match key.modifiers {
+                            KeyModifiers::CONTROL | KeyModifiers::ALT => {
+                                lobby.typing.on_ctrl_backspace();
+                            }
+                            _ => {
+                                lobby.typing.on_backspace();
+                            }
+                        }
                     }
                 }
             }

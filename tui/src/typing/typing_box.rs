@@ -223,6 +223,21 @@ impl Typing {
         }
     }
 
+    /// Deletes the word
+    pub fn on_ctrl_backspace(&mut self) {
+        if self.letter_index == 0 {
+            self.on_backspace();
+        }
+
+        while self.letter_index != 0 {
+            if self.word_index == 0 && self.letter_index == 0 {
+                break;
+            }
+
+            self.on_backspace();
+        }
+    }
+
     /// Get current word.
     pub fn get_curr_word(&self) -> Option<&Word> {
         self.words.get(self.word_index)
@@ -967,5 +982,10 @@ mod typing_test_test {
         });
 
         assert_eq!(test.n_wrongs, 2)
+    }
+
+    #[test]
+    fn test_on_word_backspace() {
+        todo!();
     }
 }
