@@ -293,7 +293,7 @@ fn update_lobby_info(model: &mut MultiplayerModel, msg: Msg) -> Option<crate::ac
     None
 }
 
-// Sends the user's stats to the server
+/// Sends the user's stats to the server
 fn send_update_stats(model: &MultiplayerModel, lobby: &Lobby) {
     let wpm = lobby.typing.net_wpm();
     let progress = typing_progress(lobby);
@@ -301,7 +301,7 @@ fn send_update_stats(model: &MultiplayerModel, lobby: &Lobby) {
     model.send_msg(WsMsg::UpdateStats(wpm, progress as u8));
 }
 
-// Get the progress
+/// Get the progress
 fn typing_progress(lobby: &Lobby) -> usize {
     let progress = lobby.typing.letters_typed() * 100 / lobby.lobby_info.data.text.len();
 
