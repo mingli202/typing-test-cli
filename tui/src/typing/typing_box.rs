@@ -179,11 +179,11 @@ impl Typing {
             }
 
             self.word_index -= 1;
-            self.letter_index = self.words[self.word_index].last_typed_letter_index;
 
-            if let Some(word) = self.get_curr_word()
-                && word.is_error()
-            {
+            let word = &self.words[self.word_index];
+            self.letter_index = word.last_typed_letter_index;
+
+            if word.is_error() {
                 self.n_wrongs -= 1;
             }
 
@@ -252,29 +252,29 @@ impl Typing {
     /// If it's the last word, mark it as error and end the test
     fn on_space(&mut self) -> bool {
         let len = self.words.len();
-
+        let is_last_word = self.word_index >= len - 1;
         let curr_word = &mut self.words[self.word_index];
+        let is_curr_word_error = curr_word.is_error();
+
+        if self.stop_on_error && is_curr_word_error {
+            self.add_letter_to_current_word('_');
+            self.letter_index += 1;
+            return false;
+        }
+
         curr_word.last_typed_letter_index = self.letter_index;
 
-        let is_curr_word_error = curr_word.is_error();
         if is_curr_word_error {
             self.n_wrongs += 1;
         }
 
-        let is_last_word = self.word_index >= len - 1;
-
-        if is_last_word && !(self.stop_on_error && is_curr_word_error) {
+        if is_last_word {
             return true;
         }
 
-        if is_curr_word_error && self.stop_on_error {
-            self.add_letter_to_current_word('_');
-            self.letter_index += 1;
-        } else {
-            self.word_index += 1;
-            self.letter_index = 0;
-            self.n_letters_typed += 1;
-        }
+        self.word_index += 1;
+        self.letter_index = 0;
+        self.n_letters_typed += 1;
 
         false
     }
@@ -925,5 +925,31 @@ mod typing_test_test {
                 TypedState::Extra
             ],
         )
+    }
+
+    #[test]
+    fn test_stop_on_error_repeat_space() {
+        let mut test = Typing::new("Hello World!").stop_on_error(true);
+
+        "Hel       ".chars().for_each(|c| {
+            test.on_type(c);
+        });
+
+        for _ in 0..7 {
+            test.on_backspace();
+        }
+
+        assert_eq!(test.n_wrongs, 0)
+    }
+
+    #[test]
+    fn test_repeat_space() {
+        let mut test = Typing::new("Hello World!");
+
+        "Hel       ".chars().for_each(|c| {
+            test.on_type(c);
+        });
+
+        assert_eq!(test.n_wrongs, 2)
     }
 }
