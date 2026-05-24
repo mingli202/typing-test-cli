@@ -609,7 +609,8 @@ fn view_section_wpm(section_wpm: &[(f64, f64)], net_wpm: f64, area: Rect, buf: &
         .iter()
         .map(|(_, wpm)| wpm.ceil() as i32)
         .max()
-        .unwrap_or(0);
+        .unwrap_or(0)
+        .max(net_wpm.ceil() as i32);
 
     // Make the graph go to 1 if it's less for prettier graph
     let max_wpm = if max_wpm <= 1 { 1 } else { max_wpm };
