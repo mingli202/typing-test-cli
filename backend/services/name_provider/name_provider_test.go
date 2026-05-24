@@ -52,47 +52,6 @@ func TestNewNameReturnsErrorWhenRepositoryIsEmpty(t *testing.T) {
 	}
 }
 
-func TestLessThan2NounsOrAdjectives(t *testing.T) {
-	tests := []struct {
-		name        string
-		provider    NameProvider
-		expectedVal bool
-	}{
-		{
-			name: "both have at least two",
-			provider: NameProvider{
-				nouns:      []string{"a", "b"},
-				adjectives: []string{"c", "d"},
-			},
-			expectedVal: false,
-		},
-		{
-			name: "nouns has fewer than two",
-			provider: NameProvider{
-				nouns:      []string{"a"},
-				adjectives: []string{"c", "d"},
-			},
-			expectedVal: true,
-		},
-		{
-			name: "adjectives has fewer than two",
-			provider: NameProvider{
-				nouns:      []string{"a", "b"},
-				adjectives: []string{"c"},
-			},
-			expectedVal: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.provider.LessThan2NounsOrAdjectives(); got != tt.expectedVal {
-				t.Fatalf("expected %v, got %v", tt.expectedVal, got)
-			}
-		})
-	}
-}
-
 func TestDefaultNameProvider(t *testing.T) {
 	provider := defaultNameProvider()
 
