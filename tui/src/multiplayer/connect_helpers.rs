@@ -23,7 +23,8 @@ pub async fn connect_to_ws(
     event_tx: UnboundedSender<CustomEvent>,
     write_rx: UnboundedReceiver<String>,
 ) -> color_eyre::Result<()> {
-    let request = "ws://localhost:8080/ws".into_client_request()?;
+    let ws_url = option_env!("WS_URL").unwrap_or("ws://localhost:8080/ws");
+    let request = ws_url.into_client_request()?;
 
     let (stream, _) = connect_async(request).await?;
 
