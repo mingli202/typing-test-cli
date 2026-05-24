@@ -87,6 +87,7 @@ jobs:
         if: steps.version.outputs.changed == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+          WS_URL: ${{ secrets.WS_URL }}
         working-directory: tui
         run: cargo publish --locked
 
