@@ -77,7 +77,7 @@ pub fn update(
             }
             KeyCode::Backspace => match key.modifiers {
                 KeyModifiers::CONTROL | KeyModifiers::ALT => {
-                    typing_test.on_ctrl_backspace();
+                    typing_test.on_word_backspace();
                 }
                 _ => {
                     typing_test.on_backspace();
