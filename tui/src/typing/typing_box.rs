@@ -99,8 +99,8 @@ impl Typing {
         if is_done {
             self.time_ended = Some(Instant::now());
 
-            // Move to the end of the words so that n_wrongs counts it
-            self.word_index = self.words.len();
+            // word_index should remain at the last word to keep space counting correct,
+            // since n_wrongs is already counted in on_space for all prior words.
         }
 
         is_done
