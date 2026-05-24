@@ -231,7 +231,7 @@ impl Typing {
     }
 
     /// Deletes the word
-    pub fn on_ctrl_backspace(&mut self) {
+    pub fn on_word_backspace(&mut self) {
         if self.letter_index == 0 {
             self.on_backspace();
         }
@@ -992,7 +992,53 @@ mod typing_test_test {
     }
 
     #[test]
-    fn test_on_word_backspace() {
-        todo!();
+    fn test_on_word_backspace_extra_letters() {
+        // Arrange
+        let mut test = Typing::new("Hello world! is this not peak?");
+
+        "Hello wo isdfas".chars().for_each(|c| {
+            test.on_type(c);
+        });
+        // Act
+        test.on_word_backspace();
+
+        // Assert
+        assert_eq!(test.word_index, 2);
+        assert_eq!(test.letter_index, 0);
+    }
+
+    #[test]
+    fn test_on_word_backspace_skipped_word() {
+        // Arrange
+        let mut test = Typing::new("Hello world! is this not peak?");
+
+        "Hello wo isdfas".chars().for_each(|c| {
+            test.on_type(c);
+        });
+        // Act
+        test.on_word_backspace();
+        test.on_word_backspace();
+
+        // Assert
+        assert_eq!(test.word_index, 1);
+        assert_eq!(test.letter_index, 0);
+    }
+
+    #[test]
+    fn test_on_word_backspace_normal_word() {
+        // Arrange
+        let mut test = Typing::new("Hello world! is this not peak?");
+
+        "Hello wo isdfas".chars().for_each(|c| {
+            test.on_type(c);
+        });
+        // Act
+        test.on_word_backspace();
+        test.on_word_backspace();
+        test.on_word_backspace();
+
+        // Assert
+        assert_eq!(test.word_index, 0);
+        assert_eq!(test.letter_index, 0);
     }
 }
