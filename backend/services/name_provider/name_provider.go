@@ -44,11 +44,6 @@ func (provider *NameProvider) NewName() (string, error) {
 	return provider.adjectives[randomAdIndex] + " " + provider.nouns[randomNounIndex], nil
 }
 
-// Returns whether the nouns or adjectives repo is empty or only 1
-func (provider *NameProvider) LessThan2NounsOrAdjectives() bool {
-	return len(provider.nouns) < 2 || len(provider.adjectives) < 2
-}
-
 // Returns a default provider in cases of errors
 func defaultNameProvider() NameProvider {
 	return NameProvider{

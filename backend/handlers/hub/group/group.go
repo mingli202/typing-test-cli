@@ -501,14 +501,13 @@ func (group *Group) canUserStartGame(u *user.User) error {
 
 // Returns a new name unique within this group
 func (group *Group) newNameLocked() string {
-	name, _ := group.nameProvider.NewName()
+	potentialName, _ := group.nameProvider.NewName()
 
-	if group.nameProvider.LessThan2NounsOrAdjectives() {
-		return name
-	}
-
+	n := 1
+	name := potentialName
 	for group.nameExist(name) {
-		name, _ = group.nameProvider.NewName()
+		name = fmt.Sprintf("%s (%d)", potentialName, n)
+		n += 1
 	}
 
 	return name
