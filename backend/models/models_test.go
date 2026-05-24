@@ -37,7 +37,7 @@ func TestNewGameToMsg(t *testing.T) {
 	}
 
 	msg := mustMsg(t, newGame)
-	assertMsg(t, msg, `NewGame {"data":{"text":"qwer","source":"zxcv"},"players_info":{"lobby_id":"asdf","version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}}`)
+	assertMsg(t, msg, `NewGame {"data":{"text":"qwer","source":"zxcv"},"players_info":{"lobby_id":"asdf","version":1,"players":{"player-1":{"name":"","is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"name":"","is_leader":false,"wpm":10.1,"progress_percent":100}}}}`)
 
 	var payload NewGame
 	unmarshalPayload(t, msg, "NewGame", &payload)
@@ -50,7 +50,7 @@ func TestEndGameToMsg(t *testing.T) {
 	}
 
 	msg := mustMsg(t, endGame)
-	assertMsg(t, msg, `EndGame {"lobby_id":"asdf","version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
+	assertMsg(t, msg, `EndGame {"lobby_id":"asdf","version":1,"players":{"player-1":{"name":"","is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"name":"","is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
 
 	var payload PlayersInfoSnapshot
 	unmarshalPayload(t, msg, "EndGame", &payload)
@@ -100,7 +100,7 @@ func TestPlayersInfoSnapshotToMsg(t *testing.T) {
 	playersInfo := testPlayersInfoSnapshot()
 
 	msg := mustMsg(t, playersInfo)
-	assertMsg(t, msg, `PlayersInfo {"lobby_id":"asdf","version":1,"players":{"player-1":{"is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
+	assertMsg(t, msg, `PlayersInfo {"lobby_id":"asdf","version":1,"players":{"player-1":{"name":"","is_leader":true,"wpm":42.5,"progress_percent":75},"player-2":{"name":"","is_leader":false,"wpm":10.1,"progress_percent":100}}}`)
 
 	var payload PlayersInfoSnapshot
 	unmarshalPayload(t, msg, "PlayersInfo", &payload)

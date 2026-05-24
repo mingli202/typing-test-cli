@@ -9,7 +9,7 @@ use tokio::time::interval;
 
 use self::action::Action;
 use self::args::Args;
-use self::model::{AppModel, handle_action, update, view};
+use self::model::{AppModel, handle_action, handle_toast_action, update, view};
 use self::msg::Msg;
 use self::util::toast::ToastAction;
 
@@ -19,6 +19,7 @@ mod model;
 mod msg;
 mod multiplayer;
 mod singleplayer;
+pub mod typing;
 mod util;
 
 pub enum CustomEvent {
@@ -27,13 +28,15 @@ pub enum CustomEvent {
     Render,
     Key(KeyEvent),
     ToastAction(ToastAction),
+    FocusGained,
+    FocusLost,
 }
 
 pub async fn run(terminal: &mut DefaultTerminal, args: Args) -> color_eyre::Result<()> {
     let (event_tx, mut event_rx) = mpsc::unbounded_channel();
     init_event_loop(event_tx.clone(), args.fps, args.tps);
 
-    let mut app_model = AppModel::new(event_tx, args.words_path, args.quotes_path).await?;
+    let mut app_model = AppModel::new(event_tx, args).await?;
 
     while !app_model.exit {
         let mut maybe_action: Option<Action> = tokio::select! {
@@ -46,7 +49,9 @@ pub async fn run(terminal: &mut DefaultTerminal, args: Args) -> color_eyre::Resu
                         None
                     }
                     CustomEvent::Key(key) => update(&mut app_model, Msg::Key(key)),
-                    CustomEvent::ToastAction(action) => update(&mut app_model, Msg::ToastAction(action)),
+                    CustomEvent::ToastAction(action) => handle_toast_action(&mut app_model, action),
+                    CustomEvent::FocusGained => update(&mut app_model, Msg::FocusGained),
+                    CustomEvent::FocusLost => update(&mut app_model, Msg::FocusLost),
                 }
 
             },
@@ -83,6 +88,8 @@ fn init_event_loop(event_tx: UnboundedSender<CustomEvent>, fps: usize, tps: usiz
                         Some(Ok(e)) => {
                             match e {
                                 Event::Key(key_event) if key_event.kind == KeyEventKind::Press => CustomEvent::Key(key_event),
+                                Event::FocusGained => CustomEvent::FocusGained,
+                                Event::FocusLost => CustomEvent::FocusLost,
                                 _ => continue,
                             }
                         }

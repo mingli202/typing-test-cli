@@ -20,8 +20,8 @@ pub struct DataProvider {
 
 impl DataProvider {
     pub fn new(
-        words_path: Option<String>,
-        quotes_path: Option<String>,
+        words_path: &Option<String>,
+        quotes_path: &Option<String>,
     ) -> color_eyre::Result<Self> {
         let words = get_words(words_path)?;
         let quotes = get_quotes(quotes_path)?;
@@ -101,7 +101,7 @@ impl DataProvider {
 }
 
 /// Gets all the words from the given path if Some, otherwise default to built-in words
-fn get_words(path: Option<String>) -> color_eyre::Result<Vec<String>> {
+fn get_words(path: &Option<String>) -> color_eyre::Result<Vec<String>> {
     let json = if let Some(path) = path {
         &fs::read_to_string(path)?
     } else {
@@ -114,7 +114,7 @@ fn get_words(path: Option<String>) -> color_eyre::Result<Vec<String>> {
 }
 
 /// Gets all the quotes from the given path if Some, otherwise default to built-in quotes
-fn get_quotes(path: Option<String>) -> color_eyre::Result<Vec<Data>> {
+fn get_quotes(path: &Option<String>) -> color_eyre::Result<Vec<Data>> {
     let json = if let Some(path) = path {
         &fs::read_to_string(path)?
     } else {
@@ -241,7 +241,7 @@ mod test {
     fn get_words_reads_custom_json_file() {
         let path = write_temp_file("words", r#"["alpha","beta"]"#);
 
-        let words = get_words(Some(path.clone())).unwrap();
+        let words = get_words(&Some(path.clone())).unwrap();
 
         assert_eq!(words, vec!["alpha".to_string(), "beta".to_string()]);
 
@@ -252,7 +252,7 @@ mod test {
     fn get_words_returns_error_for_invalid_json() {
         let path = write_temp_file("invalid_words", r#"{"not":"an array"}"#);
 
-        let result = get_words(Some(path.clone()));
+        let result = get_words(&Some(path.clone()));
 
         assert!(result.is_err(), "invalid word JSON should fail to parse");
 
@@ -269,7 +269,7 @@ mod test {
             }"#,
         );
 
-        let mut quotes = get_quotes(Some(path.clone())).unwrap();
+        let mut quotes = get_quotes(&Some(path.clone())).unwrap();
         quotes.sort_by(|a, b| a.source.cmp(&b.source).then(a.text.cmp(&b.text)));
 
         assert_eq!(quotes.len(), 2);

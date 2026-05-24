@@ -3,7 +3,7 @@ use std::fmt::Display;
 use ratatui::style::{Color, Stylize};
 use ratatui::text::Span;
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum TypedState {
     Typed(char),
     NotTyped,
@@ -11,7 +11,7 @@ pub enum TypedState {
 }
 
 /// Represents a single letter of a word
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct Letter {
     /// Its letter
     pub(super) letter: char,
@@ -31,7 +31,7 @@ impl Letter {
     }
 
     /// factory with typed letter
-    pub fn with_typed_letter(self, typed_letter: TypedState) -> Self {
+    pub fn with_typed_state(self, typed_letter: TypedState) -> Self {
         Letter {
             typed_state: typed_letter,
             ..self

@@ -12,6 +12,7 @@ import (
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
+	"tui/backend/services/name_provider"
 
 	"github.com/gorilla/websocket"
 )
@@ -22,13 +23,15 @@ type Hub struct {
 	mu           sync.RWMutex
 	groups       map[string]*group.Group
 	dataProvider *data_provider.DataProvider
+	nameProvder  *name_provider.NameProvider
 }
 
 // Makes a new hub
-func newHub(dataProvider *data_provider.DataProvider) Hub {
+func newHub(dataProvider *data_provider.DataProvider, nameProvider *name_provider.NameProvider) Hub {
 	return Hub{
 		groups:       make(map[string]*group.Group),
 		dataProvider: dataProvider,
+		nameProvder:  nameProvider,
 	}
 }
 
@@ -154,7 +157,7 @@ func (hub *Hub) newGroup() *group.Group {
 
 	id := hub.newGroupIdLocked()
 
-	group := group.NewGroup(id, hub.dataProvider)
+	group := group.NewGroup(id, hub.dataProvider, hub.nameProvder)
 	hub.groups[group.Id()] = group
 
 	return group
@@ -355,8 +358,8 @@ func (hub *Hub) String() string {
 	return fmt.Sprintf("Hub {\n    groups: %#v\n}", hub.groups)
 }
 
-func Handler(dataProvider *data_provider.DataProvider) http.Handler {
-	hub := newHub(dataProvider)
+func Handler(dataProvider *data_provider.DataProvider, nameProvider *name_provider.NameProvider) http.Handler {
+	hub := newHub(dataProvider, nameProvider)
 
 	return &hub
 }

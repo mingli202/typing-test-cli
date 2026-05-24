@@ -12,6 +12,7 @@ import (
 	"time"
 	"tui/backend/handlers/hub"
 	"tui/backend/services/data_provider"
+	"tui/backend/services/name_provider"
 )
 
 const port = 8080
@@ -68,11 +69,17 @@ func registerRoutes(mux *http.ServeMux) error {
 		return err
 	}
 
+	nameProvider, err := name_provider.NewNameProvider()
+
+	if err != nil {
+		return err
+	}
+
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		fmt.Fprintf(w, "Ready at %v!\n", ctx.Value("serverAddr"))
 	})
-	mux.Handle("/ws", hub.Handler(&dataProvider))
+	mux.Handle("/ws", hub.Handler(&dataProvider, &nameProvider))
 
 	return nil
 }

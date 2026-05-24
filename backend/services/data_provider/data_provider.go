@@ -21,7 +21,6 @@ func NewDataProvider() (DataProvider, error) {
 	if err := json.Unmarshal(assets.Data, &repository); err != nil {
 		log.Printf("Could no decode into Data: %v", err)
 		return defaultProvider(), err
-
 	}
 
 	return DataProvider{repository}, nil

@@ -100,14 +100,6 @@ impl Toast {
         }
     }
 
-    /// Convenient method to send message
-    pub fn send(&self, msg: ToastMessage) -> color_eyre::Result<()> {
-        self.event_tx
-            .send(CustomEvent::ToastAction(ToastAction::Push(msg)))?;
-
-        Ok(())
-    }
-
     /// Handle incoming action
     pub fn handle_action(&mut self, action: ToastAction) {
         match action {
@@ -175,6 +167,8 @@ pub fn view(toast: &Toast, area: Rect, buf: &mut Buffer) {
 mod test {
     use std::sync::Arc;
 
+    use crate::util::toast;
+
     use super::*;
 
     use pretty_assertions::assert_eq;
@@ -183,7 +177,7 @@ mod test {
     #[tokio::test]
     async fn toast_messages() {
         let (tx, mut rx) = mpsc::unbounded_channel::<CustomEvent>();
-        let toast = Toast::new(tx);
+        let toast = Toast::new(tx.clone());
 
         let toast = Arc::new(Mutex::new(toast));
         let toast_clone = Arc::clone(&toast);
@@ -197,35 +191,16 @@ mod test {
             }
         });
 
-        {
-            let lock = toast.lock().await;
-            lock.send(ToastMessage::info("First".to_string())).unwrap();
-        }
-
+        toast::send(&tx, ToastMessage::info("First".to_string())).unwrap();
         sleep(Duration::from_millis(100)).await;
 
-        {
-            let lock = toast.lock().await;
-            lock.send(ToastMessage::warning("Second".to_string()))
-                .unwrap();
-        }
-
+        toast::send(&tx, ToastMessage::warning("Second".to_string())).unwrap();
         sleep(Duration::from_millis(100)).await;
 
-        {
-            let lock = toast.lock().await;
-            lock.send(ToastMessage::success("Third".to_string()))
-                .unwrap();
-        }
-
+        toast::send(&tx, ToastMessage::success("Third".to_string())).unwrap();
         sleep(Duration::from_millis(100)).await;
 
-        {
-            let lock = toast.lock().await;
-            lock.send(ToastMessage::error("Fourth".to_string()))
-                .unwrap();
-        }
-
+        toast::send(&tx, ToastMessage::error("Fourth".to_string())).unwrap();
         sleep(Duration::from_millis(100)).await;
 
         {

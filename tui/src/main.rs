@@ -2,6 +2,7 @@ use std::io::{self, Stdout};
 
 use clap::Parser;
 use crossterm::cursor;
+use crossterm::event::{DisableFocusChange, EnableFocusChange};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::Terminal;
 use ratatui::prelude::CrosstermBackend;
@@ -33,7 +34,12 @@ async fn main() -> color_eyre::Result<()> {
 fn setup_terminal() -> color_eyre::Result<Terminal<CrosstermBackend<Stdout>>> {
     let mut stdout = io::stdout();
     crossterm::terminal::enable_raw_mode()?;
-    crossterm::execute!(stdout, EnterAlternateScreen, cursor::Hide)?;
+    crossterm::execute!(
+        stdout,
+        EnterAlternateScreen,
+        cursor::Hide,
+        EnableFocusChange
+    )?;
 
     let terminal = Terminal::new(CrosstermBackend::new(stdout))?;
 
@@ -43,6 +49,11 @@ fn setup_terminal() -> color_eyre::Result<Terminal<CrosstermBackend<Stdout>>> {
 fn teardown_terminal() -> color_eyre::Result<()> {
     let mut stdout = io::stdout();
     crossterm::terminal::disable_raw_mode()?;
-    crossterm::execute!(stdout, LeaveAlternateScreen, cursor::Show)?;
+    crossterm::execute!(
+        stdout,
+        LeaveAlternateScreen,
+        cursor::Show,
+        DisableFocusChange
+    )?;
     Ok(())
 }

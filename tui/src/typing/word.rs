@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use crate::singleplayer::typing::letter::TypedState;
-
-use super::letter::Letter;
+use super::letter::{Letter, TypedState};
 
 /// Represent a single word of the text to type
 #[derive(Debug)]

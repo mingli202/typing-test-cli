@@ -11,6 +11,7 @@ import (
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
+	"tui/backend/services/name_provider"
 )
 
 type GameStatus int
@@ -33,6 +34,7 @@ type Group struct {
 	playerInfoVersion uint64
 	status            GameStatus
 	end               chan struct{}
+	nameProvider      *name_provider.NameProvider
 }
 
 func (group *Group) Id() string {
@@ -40,7 +42,7 @@ func (group *Group) Id() string {
 }
 
 // Makes a new group with the given id and data
-func NewGroup(id string, dataProvider *data_provider.DataProvider) *Group {
+func NewGroup(id string, dataProvider *data_provider.DataProvider, nameProvider *name_provider.NameProvider) *Group {
 	data, _ := dataProvider.NewData()
 
 	group := Group{
@@ -50,6 +52,7 @@ func NewGroup(id string, dataProvider *data_provider.DataProvider) *Group {
 		dataProvider: dataProvider,
 		playerInfo:   make(map[string]*models.PlayerInfo),
 		status:       Waiting,
+		nameProvider: nameProvider,
 	}
 
 	return &group
@@ -71,8 +74,10 @@ func (group *Group) AddUser(u *user.User) {
 	}
 
 	if group.status != Playing {
+		name := group.newNameLocked()
 		group.playerInfo[u.Id()] = &models.PlayerInfo{
 			IsLeader: *group.leaderId == u.Id(),
+			Name:     name,
 		}
 	}
 
@@ -133,6 +138,12 @@ func (group *Group) GetUsersSnapshot() []*user.User {
 	group.mu.RLock()
 	defer group.mu.RUnlock()
 
+	return group.GetUsersSnapshotLocked()
+}
+
+// Gets list of users at this moment of calling this function
+// Assumes already holds the mutex lock
+func (group *Group) GetUsersSnapshotLocked() []*user.User {
 	snapShot := make([]*user.User, 0)
 
 	for u := range maps.Values(group.users) {
@@ -155,7 +166,10 @@ func (group *Group) UpdateStats(u *user.User, wpm float64, progressPercent uint8
 
 	if p, ok := group.playerInfo[u.Id()]; ok {
 		p.Wpm = wpm
-		p.ProgressPercent = progressPercent
+
+		if progressPercent > p.ProgressPercent {
+			p.ProgressPercent = progressPercent
+		}
 
 		group.playerInfoVersion += 1
 
@@ -264,13 +278,15 @@ func (group *Group) countDown() {
 	ticker := time.Tick(time.Second * 1)
 	countdown := 10
 
+	group.broadcast(models.CountdownMessage{Countdown: countdown})
 	for _ = range ticker {
-		group.broadcast(models.CountdownMessage{Countdown: countdown})
 		countdown -= 1
 
 		if countdown == 0 {
 			return
 		}
+
+		group.broadcast(models.CountdownMessage{Countdown: countdown})
 	}
 }
 
@@ -419,9 +435,17 @@ func (group *Group) resetPlayerInfo() {
 	defer group.mu.Unlock()
 
 	for _, userId := range group.GetUserIdsSnapshotLocked() {
-		group.playerInfo[userId] = &models.PlayerInfo{
+		newPlayerInfo := &models.PlayerInfo{
 			IsLeader: group.leaderId != nil && *group.leaderId == userId,
 		}
+
+		if existingPlayerInfo, ok := group.playerInfo[userId]; ok {
+			newPlayerInfo.Name = existingPlayerInfo.Name
+		} else {
+			newPlayerInfo.Name = group.newNameLocked()
+		}
+
+		group.playerInfo[userId] = newPlayerInfo
 	}
 
 	group.playerInfoVersion += 1
@@ -473,4 +497,29 @@ func (group *Group) canUserStartGame(u *user.User) error {
 	}
 
 	return nil
+}
+
+// Returns a new name unique within this group
+func (group *Group) newNameLocked() string {
+	potentialName, _ := group.nameProvider.NewName()
+
+	n := 1
+	name := potentialName
+	for group.nameExist(name) {
+		name = fmt.Sprintf("%s (%d)", potentialName, n)
+		n += 1
+	}
+
+	return name
+}
+
+// Check if the given name already exists in this group
+func (group *Group) nameExist(name string) bool {
+	for _, player := range group.playerInfo {
+		if player.Name == name {
+			return true
+		}
+	}
+
+	return false
 }

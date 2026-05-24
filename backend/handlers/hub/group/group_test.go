@@ -11,12 +11,14 @@ import (
 	"tui/backend/handlers/hub/user"
 	"tui/backend/models"
 	"tui/backend/services/data_provider"
+	"tui/backend/services/name_provider"
 )
 
 var dataProvider, _ = data_provider.NewDataProvider()
+var nameProvider, _ = name_provider.NewNameProvider()
 
 func newGroup() *Group {
-	group := NewGroup("asdf", &dataProvider)
+	group := NewGroup("asdf", &dataProvider, &nameProvider)
 
 	return group
 }
@@ -443,15 +445,23 @@ func TestNewGameAfterGameEnds(t *testing.T) {
 				return
 			case p := <-ch1:
 				msg1.mu.Lock()
-				msg1.msg = p
+
+				if msg, _ := p.ToMsg(); strings.HasPrefix(msg, "NewGame") {
+					msg1.msg = p
+				}
+
 				msg1.mu.Unlock()
 			case p := <-ch2:
 				msg2.mu.Lock()
-				msg2.msg = p
+				if msg, _ := p.ToMsg(); strings.HasPrefix(msg, "NewGame") {
+					msg2.msg = p
+				}
 				msg2.mu.Unlock()
 			case p := <-ch3:
 				msg3.mu.Lock()
-				msg3.msg = p
+				if msg, _ := p.ToMsg(); strings.HasPrefix(msg, "NewGame") {
+					msg3.msg = p
+				}
 				msg3.mu.Unlock()
 			}
 		}
@@ -681,5 +691,19 @@ func TestStartGameRepeatedRunsTerminateCleanly(t *testing.T) {
 		case <-time.After(1 * time.Second):
 			t.Fatal("startGame did not stop after end signal")
 		}
+	}
+}
+
+func TestAddUserGotNameAdded(t *testing.T) {
+	// Arrange
+	u1 := user.NewUser(nil)
+	gr := newGroup()
+
+	// Act
+	gr.AddUser(&u1)
+
+	// Assert
+	if gr.playerInfo[u1.Id()].Name == "" {
+		t.Error("Player did not have their name set")
 	}
 }

@@ -1,27 +1,19 @@
 use std::time::{Duration, Instant};
 
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Offset, Rect};
-use ratatui::macros::{line, text};
-use ratatui::style::{Color, Stylize};
+use ratatui::macros::line;
 use ratatui::widgets::Widget;
 
-use self::mode_selection::ModeSelection;
-use self::typing::TypingTest;
+use crate::msg::Msg;
+use crate::typing;
+use crate::typing::Typing;
+use crate::util::view_helpers;
 
 use super::action::Action;
+use super::mode_selection::{self, ModeSelection};
 use super::{Mode, SharedModel};
-
-mod letter;
-mod mode_selection;
-pub mod typing;
-mod word;
-
-pub enum Msg {
-    Tick,
-    Key(KeyCode),
-}
 
 #[derive(Debug, Default)]
 pub struct TypingStats {
@@ -31,19 +23,21 @@ pub struct TypingStats {
 }
 
 pub struct TypingModel {
-    typing_test: TypingTest,
+    typing: Typing,
     stats_last_updated_time: Instant,
     stats: TypingStats,
     selected_mode: ModeSelection,
+    is_focused: bool,
 }
 
 impl TypingModel {
-    pub fn new(text: &str, initial_mode: Mode) -> Self {
+    pub fn new(text: &str, initial_mode: Mode, no_error: bool) -> Self {
         TypingModel {
-            typing_test: TypingTest::new(text),
+            typing: Typing::new(text).stop_on_error(no_error),
             stats_last_updated_time: Instant::now(),
             stats: TypingStats::default(),
             selected_mode: ModeSelection::new(initial_mode),
+            is_focused: true,
         }
     }
 }
@@ -54,14 +48,15 @@ pub fn update(
     msg: Msg,
 ) -> Option<Action> {
     let TypingModel {
-        typing_test,
+        typing: typing_test,
         stats_last_updated_time,
         stats,
         selected_mode,
+        is_focused,
     } = typing_model;
 
     match msg {
-        Msg::Key(key) => match key {
+        Msg::Key(key) => match key.code {
             KeyCode::Char(c) => {
                 typing_test.start();
 
@@ -80,14 +75,19 @@ pub fn update(
                     });
                 }
             }
-            KeyCode::Backspace => {
-                typing_test.on_backspace();
-            }
+            KeyCode::Backspace => match key.modifiers {
+                KeyModifiers::CONTROL | KeyModifiers::ALT => {
+                    typing_test.on_word_backspace();
+                }
+                _ => {
+                    typing_test.on_backspace();
+                }
+            },
             KeyCode::Tab => {
                 return Some(Action::NewTypingScreen);
             }
             KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down => {
-                return handle_arrow_keys(selected_mode, shared_model, key);
+                return handle_arrow_keys(selected_mode, shared_model, key.code);
             }
             _ => {}
         },
@@ -125,6 +125,8 @@ pub fn update(
                 stats.elapsed = elapsed
             }
         }
+        Msg::FocusGained => *is_focused = true,
+        Msg::FocusLost => *is_focused = false,
     };
 
     None
@@ -165,12 +167,17 @@ fn handle_arrow_keys(
 /// Main view function for typing test screen
 pub fn view(typing_model: &TypingModel, shared_model: &SharedModel, area: Rect, buf: &mut Buffer) {
     let typing_test_area = area.centered_vertically(Constraint::Length(3));
-    typing::view_typing_test(&typing_model.typing_test, typing_test_area, buf);
+    typing::view_typing_test(
+        &typing_model.typing,
+        typing_model.is_focused,
+        typing_test_area,
+        buf,
+    );
 
     view_stats(
         &typing_model.stats,
         &shared_model.mode,
-        typing_model.typing_test.n_words(),
+        typing_model.typing.n_words(),
         typing_test_area,
         buf,
     );
@@ -207,15 +214,9 @@ fn view_stats(
 
 /// Render some instructions
 fn view_bottom_menu_typing(area: Rect, buf: &mut Buffer) {
-    let text = text![
-        line!("Next <Tab>  Quit <Esc>"),
-        line!("Select mode <Up/Down/Left/Right>"),
-    ]
-    .fg(Color::DarkGray)
-    .centered();
-
-    let mut menu_area = area.centered_horizontally(Constraint::Length(text.width() as u16));
-    menu_area.y = area.bottom().saturating_sub(text.height() as u16);
-
-    text.render(menu_area, buf);
+    view_helpers::view_bottom_menu(
+        &["Next <Tab>  PVP <C-p>", "Select mode <Up/Down/Left/Right>"],
+        area,
+        buf,
+    );
 }
