@@ -27,6 +27,11 @@ pub async fn connect_to_ws(
 
     let (stream, _) = connect_async(request).await?;
 
+    {
+        let mut lock = game_model.write().unwrap();
+        lock.is_connected = true;
+    }
+
     let (write, read) = stream.split();
 
     let (read_tx, read_rx) = mpsc::unbounded_channel::<String>();

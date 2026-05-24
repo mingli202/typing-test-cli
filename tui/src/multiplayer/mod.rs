@@ -1,5 +1,5 @@
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossterm::event::{KeyCode, KeyModifiers};
 use itertools::Itertools;
@@ -53,6 +53,7 @@ pub struct PendingLobby {
 
 #[derive(Default)]
 pub struct GameModel {
+    is_connected: bool,
     user_id: Option<String>,
     active_lobby_id: Option<String>,
     pending_lobby: PendingLobby,
@@ -332,6 +333,25 @@ fn typing_progress(lobby: &Lobby) -> usize {
 
 pub fn view(model: &MultiplayerModel, area: Rect, buf: &mut Buffer) {
     let lock = model.game_model.read().unwrap();
+
+    if !lock.is_connected {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |s| s.as_secs())
+            % 4;
+
+        let n_dots = ".".repeat(now as usize);
+
+        let text = line!("Connecting", n_dots);
+        let centered = area.centered(
+            Constraint::Length(text.width() as u16),
+            Constraint::Length(1),
+        );
+        text.render(centered, buf);
+
+        view_helpers::view_bottom_menu(&["Singleplayer <C-p>"], area, buf);
+        return;
+    }
 
     match lock.lobby {
         None => {
