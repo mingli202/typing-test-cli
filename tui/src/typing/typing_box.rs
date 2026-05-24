@@ -156,6 +156,13 @@ impl Typing {
         self.time_started = Some(Instant::now());
     }
 
+    /// Ends the typing test now if it has started and wasn't already ended.
+    pub fn end_now(&mut self) {
+        if self.has_started() && !self.is_done() {
+            self.time_ended = Some(Instant::now());
+        }
+    }
+
     /// Gets the current wpm at the time called
     pub fn net_wpm(&self) -> f64 {
         let wpm = match self.elapsed_since_start_sec() {

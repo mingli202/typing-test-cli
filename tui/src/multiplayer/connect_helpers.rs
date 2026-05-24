@@ -181,6 +181,13 @@ fn parse_ws_msg(msg: &str, game_model: Arc<RwLock<GameModel>>) -> Result<(), Str
         "EndGame" => {
             let player_info = parse_payload_json::<PlayersInfoSnapshot>(&words)?;
             let mut lock = game_model.write().unwrap();
+
+            // Freeze local elapsed time when the game ends so post-game net WPM is stable
+            // even if this client did not reach local typing completion.
+            if let Some(lobby) = &mut lock.lobby {
+                lobby.typing.end_now();
+            }
+
             lock.players_info = Some(player_info);
             lock.game_status = Some(GameStatus::End);
         }
@@ -645,6 +652,61 @@ mod test {
             version,
             players,
         }
+    }
+
+    #[tokio::test]
+    async fn test_end_game_freezes_local_net_wpm_for_post_game_graph() {
+        let game_model: Arc<RwLock<GameModel>> = Arc::new(RwLock::new(GameModel::default()));
+
+        let lobby_info = LobbyInfo {
+            lobby_id: "lobby-1".to_string(),
+            data: Data {
+                text: "hello world".to_string(),
+                source: "source".to_string(),
+            },
+        };
+
+        assert_eq!(
+            parse_ws_msg(
+                &format!("LobbyInfo {}", serde_json::to_string(&lobby_info).unwrap()),
+                Arc::clone(&game_model)
+            ),
+            Ok(())
+        );
+        assert_eq!(parse_ws_msg("StartGame", Arc::clone(&game_model)), Ok(()));
+
+        {
+            let mut lock = game_model.write().unwrap();
+            let lobby = lock.lobby.as_mut().unwrap();
+            for c in "hello".chars() {
+                lobby.typing.on_type(c);
+            }
+        }
+
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+
+        let final_players = players_info_snapshot("lobby-1", 2, &["user-1"]);
+        assert_eq!(
+            parse_ws_msg(
+                &format!("EndGame {}", serde_json::to_string(&final_players).unwrap()),
+                Arc::clone(&game_model)
+            ),
+            Ok(())
+        );
+
+        let wpm_after_end_1 = {
+            let lock = game_model.read().unwrap();
+            lock.lobby.as_ref().unwrap().typing.net_wpm()
+        };
+
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+
+        let wpm_after_end_2 = {
+            let lock = game_model.read().unwrap();
+            lock.lobby.as_ref().unwrap().typing.net_wpm()
+        };
+
+        assert_eq!(wpm_after_end_1, wpm_after_end_2);
     }
 
     #[derive(Debug, PartialEq, PartialOrd)]
