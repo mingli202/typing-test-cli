@@ -98,5 +98,5 @@ async fn load() -> color_eyre::Result<ConfigData, String> {
 
 /// Gets the file as a PathBuf
 fn get_config_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|path| path.join(".cache/typing-test-tui.toml"))
+    dirs::home_dir().map(|path| path.join(".typing-test-tui.toml"))
 }
