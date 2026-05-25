@@ -2,6 +2,9 @@
 
 Monkeytype inspired typing test in the terminal. Can play offline using the built-in quotes or from the backend. Can also play multiplayer with others online or make your own lobby for your friends
 
+
+[![Typing test tui demo](https://img.youtube.com/vi/Thjo68Ljbko/0.jpg)](https://youtu.be/Thjo68Ljbko)
+
 ## Stack
 ### Tui client
 - Rust
