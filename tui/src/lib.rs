@@ -22,16 +22,30 @@ mod singleplayer;
 pub mod typing;
 mod util;
 
-pub const BACKEND_DOMAIN: &str = if cfg!(debug_assertions) {
+const BACKEND_DOMAIN: &str = if cfg!(debug_assertions) {
     "localhost:8080"
 } else {
     "typing-test-tui-backend.onrender.com"
 };
 
+/// Gets the url of the websocket
+/// connects to localhost for debug and to the actual backend for release
+/// uses ws for debug build and wss for release build
 pub fn ws_url() -> String {
     let schema = if cfg!(debug_assertions) { "ws" } else { "wss" };
 
     format!("{}://{}/ws", schema, BACKEND_DOMAIN)
+}
+
+/// Gets the backend url
+/// localhost for debug, and backend url for release
+pub fn backend_url() -> String {
+    let schema = if cfg!(debug_assertions) {
+        "http"
+    } else {
+        "https"
+    };
+    format!("{}://{}", schema, BACKEND_DOMAIN)
 }
 
 pub enum CustomEvent {
