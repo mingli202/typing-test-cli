@@ -1,9 +1,9 @@
 [package]
 name = "typing-test-tui"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Typing speed test tui in rust"
+description = "Multiplayer typing speed test tui in rust"
 repository = "https://github.com/mingli202/typing-test-tui"
 authors = ["mingli202"]
 
@@ -16,6 +16,7 @@ futures = "0.3.32"
 itertools = "0.14.0"
 rand = "0.10.0"
 ratatui = { version = "0.30.0", features = ["unstable-rendered-line-info"] }
+reqwest = { version = "0.13.4", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 tokio = { version = "1.50.0", features = ["full"] }
