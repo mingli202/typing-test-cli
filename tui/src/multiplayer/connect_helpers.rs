@@ -54,7 +54,10 @@ fn init_write_task<T: SinkExt<Message> + Unpin + Send + 'static>(
             tokio::select! {
                 Some(msg) = write_rx.recv() => {
                     let send_msg = Message::Text(Utf8Bytes::from(msg));
-                    let _ = write.send(send_msg).await;
+                    let res = write.send(send_msg).await;
+                    if res.is_err() {
+                        return;
+                    }
                 }
                 _ = cancel_token.cancelled() => {
                     return;
@@ -96,7 +99,10 @@ fn init_read_task<E, T: Stream<Item = Result<Message, E>> + Unpin + Send + 'stat
                                 }
                             };
 
-                            let _ = read_tx.send(text.to_string());
+                            let res = read_tx.send(text.to_string());
+                            if res.is_err() {
+                                break;
+                            }
                         },
                         None => {
                             break;
@@ -126,11 +132,14 @@ fn init_recv_msg_task(
             tokio::select! {
                 Some(msg) = read_rx.recv() => {
                     if let Err(err) = parse_ws_msg(&msg, Arc::clone(&game_model)) {
-                        let _ = toast::send(&event_tx, ToastMessage::error(err));
+                         let res = toast::send(&event_tx, ToastMessage::error(err));
+                        if res.is_err() {
+                            return;
+                        }
                     }
                 }
                 _ = cancel_token.cancelled() => {
-                        return;
+                    return;
                 }
             }
         }
