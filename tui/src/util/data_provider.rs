@@ -6,7 +6,6 @@ use rand::RngExt;
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tokio::time::timeout;
 
 use crate::backend_url;
 use crate::singleplayer::Mode;
