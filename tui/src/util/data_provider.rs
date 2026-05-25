@@ -6,6 +6,7 @@ use rand::RngExt;
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use tokio::time::timeout;
 
 use crate::backend_url;
 use crate::singleplayer::Mode;
@@ -177,17 +178,26 @@ fn init_data_tx(data_tx: mpsc::Sender<Data>) {
             .build();
 
         if let Ok(client) = http_client {
+            let mut n = 0;
+
             loop {
                 // will cap at 5 and block at data_tx.send
                 if let Ok(data) = get_data(&client).await {
+                    n = 0;
                     let did_send = data_tx.send(data).await;
 
                     if did_send.is_err() {
                         return;
                     }
                 } else {
-                    // if there's a problem, exit the task
-                    return;
+                    n += 1;
+
+                    if n == 4 {
+                        return;
+                    }
+
+                    // exponential backoff
+                    tokio::time::sleep(Duration::from_secs(2u64.pow(n))).await;
                 };
             }
         }
