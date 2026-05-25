@@ -85,8 +85,8 @@ func registerRoutes(mux *http.ServeMux) error {
 		data, err := dataProvider.NewData()
 
 		if err != nil {
-			w.Write([]byte(err.Error()))
 			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
 			return
 		}
 
