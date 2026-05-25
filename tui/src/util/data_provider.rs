@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::fs;
+use std::time::Duration;
 
 use rand::RngExt;
 use rand::seq::IndexedRandom;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 
+use crate::backend_url;
 use crate::singleplayer::Mode;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -16,6 +19,7 @@ pub struct Data {
 pub struct DataProvider {
     words: Vec<String>,
     quotes: Vec<Data>,
+    data_rx: mpsc::Receiver<Data>,
 }
 
 impl DataProvider {
@@ -26,7 +30,15 @@ impl DataProvider {
         let words = get_words(words_path)?;
         let quotes = get_quotes(quotes_path)?;
 
-        Ok(DataProvider { words, quotes })
+        let (data_tx, data_rx) = mpsc::channel(5);
+
+        init_data_tx(data_tx);
+
+        Ok(DataProvider {
+            words,
+            quotes,
+            data_rx,
+        })
     }
 
     pub fn get_data_from_mode(&self, mode: &Mode) -> Data {
@@ -143,6 +155,38 @@ fn get_quotes(path: &Option<String>) -> color_eyre::Result<Vec<Data>> {
         .collect())
 }
 
+/// pings the backend
+fn init_data_tx(data_tx: mpsc::Sender<Data>) {
+    tokio::spawn(async move {
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build();
+
+        if let Ok(client) = http_client {
+            loop {
+                // will cap at 5 and block at data_tx.send
+                if let Ok(data) = get_data(&client).await {
+                    let did_send = data_tx.send(data).await;
+
+                    if did_send.is_err() {
+                        return;
+                    }
+                };
+            }
+        }
+    });
+}
+
+/// ping the backend
+async fn get_data(client: &reqwest::Client) -> color_eyre::Result<Data> {
+    let url = backend_url() + "/health";
+
+    let res = client.get(url).send().await?;
+    let data = res.json::<Data>().await?;
+
+    Ok(data)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -169,12 +213,18 @@ mod test {
         path.to_string_lossy().into_owned()
     }
 
+    fn provider(words: Vec<String>, quotes: Vec<Data>) -> DataProvider {
+        let (_, data_rx) = mpsc::channel(5);
+        DataProvider {
+            words,
+            quotes,
+            data_rx,
+        }
+    }
+
     #[test]
     fn get_n_random_words_returns_fallback_when_words_are_empty() {
-        let provider = DataProvider {
-            words: vec![],
-            quotes: vec![],
-        };
+        let provider = provider(vec![], vec![]);
 
         let data = provider.get_n_random_words(5);
 
@@ -187,10 +237,7 @@ mod test {
 
     #[test]
     fn get_n_random_words_with_single_word_repeats_for_requested_count() {
-        let provider = DataProvider {
-            words: vec!["hello".to_string()],
-            quotes: vec![],
-        };
+        let provider = provider(vec!["hello".to_string()], vec![]);
 
         let data = provider.get_n_random_words(3);
 
@@ -200,10 +247,7 @@ mod test {
 
     #[test]
     fn get_n_random_words_with_zero_count_returns_empty_text() {
-        let provider = DataProvider {
-            words: vec!["hello".to_string()],
-            quotes: vec![],
-        };
+        let provider = provider(vec!["hello".to_string()], vec![]);
 
         let data = provider.get_n_random_words(0);
 
@@ -213,10 +257,7 @@ mod test {
 
     #[test]
     fn get_random_quote_returns_fallback_when_quotes_are_empty() {
-        let provider = DataProvider {
-            words: vec![],
-            quotes: vec![],
-        };
+        let provider = provider(vec![], vec![]);
 
         let data = provider.get_random_quote();
 
@@ -226,10 +267,7 @@ mod test {
 
     #[test]
     fn get_data_from_time_mode_uses_word_count_and_seconds_source() {
-        let provider = DataProvider {
-            words: vec!["hello".to_string()],
-            quotes: vec![],
-        };
+        let provider = provider(vec!["hello".to_string()], vec![]);
 
         let data = provider.get_data_from_mode(&Mode::Time(2));
 
@@ -284,10 +322,7 @@ mod test {
     #[test]
     #[should_panic]
     fn get_data_from_time_mode_panics_on_overflow() {
-        let provider = DataProvider {
-            words: vec!["hello".to_string()],
-            quotes: vec![],
-        };
+        let provider = provider(vec!["hello".to_string()], vec![]);
 
         let _ = provider.get_data_from_mode(&Mode::Time(usize::MAX));
     }
