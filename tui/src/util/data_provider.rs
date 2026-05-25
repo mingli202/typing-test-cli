@@ -41,7 +41,7 @@ impl DataProvider {
         })
     }
 
-    pub fn get_data_from_mode(&self, mode: &Mode) -> Data {
+    pub fn get_data_from_mode(&mut self, mode: &Mode) -> Data {
         match mode {
             Mode::Quote => self.get_random_quote(),
             Mode::Words(n) => self.get_n_random_words(*n),
@@ -59,7 +59,11 @@ impl DataProvider {
         }
     }
 
-    pub fn get_random_quote(&self) -> Data {
+    pub fn get_random_quote(&mut self) -> Data {
+        if let Some(data) = self.get_online_data() {
+            return data;
+        }
+
         let mut rng = rand::rng();
         self.quotes.choose(&mut rng).map_or_else(
             || Data {
@@ -109,6 +113,11 @@ impl DataProvider {
             text: v.join(" "),
             source: format!("{} words", n),
         }
+    }
+
+    /// Get the next online data
+    pub fn get_online_data(&mut self) -> Option<Data> {
+        self.data_rx.try_recv().ok()
     }
 }
 
@@ -257,7 +266,7 @@ mod test {
 
     #[test]
     fn get_random_quote_returns_fallback_when_quotes_are_empty() {
-        let provider = provider(vec![], vec![]);
+        let mut provider = provider(vec![], vec![]);
 
         let data = provider.get_random_quote();
 
@@ -267,7 +276,7 @@ mod test {
 
     #[test]
     fn get_data_from_time_mode_uses_word_count_and_seconds_source() {
-        let provider = provider(vec!["hello".to_string()], vec![]);
+        let mut provider = provider(vec!["hello".to_string()], vec![]);
 
         let data = provider.get_data_from_mode(&Mode::Time(2));
 
@@ -322,7 +331,7 @@ mod test {
     #[test]
     #[should_panic]
     fn get_data_from_time_mode_panics_on_overflow() {
-        let provider = provider(vec!["hello".to_string()], vec![]);
+        let mut provider = provider(vec!["hello".to_string()], vec![]);
 
         let _ = provider.get_data_from_mode(&Mode::Time(usize::MAX));
     }

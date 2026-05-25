@@ -63,7 +63,7 @@ impl SinglePlayerModel {
 
 pub fn update(
     model: &mut SinglePlayerModel,
-    data_provider: &DataProvider,
+    data_provider: &mut DataProvider,
     no_error: bool,
     msg: Msg,
 ) -> Option<crate::action::Action> {
@@ -100,7 +100,7 @@ pub fn view(model: &SinglePlayerModel, area: Rect, buf: &mut Buffer) {
 
 pub fn handle_action(
     model: &mut SinglePlayerModel,
-    data_provider: &DataProvider,
+    data_provider: &mut DataProvider,
     no_error: bool,
     action: action::Action,
 ) -> Option<action::Action> {

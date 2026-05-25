@@ -34,7 +34,7 @@ impl AppModel {
     ) -> color_eyre::Result<Self> {
         let config = Config::new(event_tx.clone()).await;
         let toast = Toast::new(event_tx.clone());
-        let data_provider = DataProvider::new(&args.words_path, &args.quotes_path)?;
+        let mut data_provider = DataProvider::new(&args.words_path, &args.quotes_path)?;
 
         let initial_mode = config.data.mode.clone();
         let data = data_provider.get_data_from_mode(&initial_mode);
@@ -79,7 +79,7 @@ pub fn update(model: &mut AppModel, msg: Msg) -> Option<Action> {
     match &mut model.screen {
         Screen::SinglePlayer(singleplayer_model) => singleplayer::update(
             singleplayer_model,
-            &model.data_provider,
+            &mut model.data_provider,
             model.args.no_error,
             msg,
         ),
