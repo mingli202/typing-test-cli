@@ -85,13 +85,14 @@ func registerRoutes(mux *http.ServeMux) error {
 		data, err := dataProvider.NewData()
 
 		if err != nil {
-			http.Error(w, "failed to serialize data", http.StatusInternalServerError)
+			http.Error(w, "failed to load data", http.StatusInternalServerError)
 			return
 		}
 
 		p, err := json.Marshal(data)
 
 		if err != nil {
+			http.Error(w, "failed to serialize data", http.StatusInternalServerError)
 			return
 		}
 
