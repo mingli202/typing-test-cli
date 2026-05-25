@@ -188,7 +188,7 @@ fn init_data_tx(data_tx: mpsc::Sender<Data>) {
 
 /// ping the backend
 async fn get_data(client: &reqwest::Client) -> color_eyre::Result<Data> {
-    let url = backend_url() + "/health";
+    let url = backend_url() + "/new_data";
 
     let res = client.get(url).send().await?;
     let data = res.json::<Data>().await?;
