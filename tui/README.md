@@ -1,6 +1,9 @@
 # Typing test tui client
 
-Monkeytype inspired typing test tui in the terminal made in rust. Words and quotes are from my rust gui typing test repo
+Monkeytype inspired typing test tui in the terminal made in rust. Words and quotes are from my rust gui typing test repo. You can also play in multiplayer with your friends.
+
+
+[![Typing test tui demo](https://img.youtube.com/vi/Thjo68Ljbko/0.jpg)](https://youtu.be/Thjo68Ljbko)
 
 ### Typing test logic
 - Must type the same character as the current letter
