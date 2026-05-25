@@ -1,8 +1,7 @@
 use clap::Parser;
 
-// TODO: --offline mode uses my own data
 #[derive(Parser, Debug)]
-#[command(version, about)]
+#[command(version, about = "Multiplayer typing test tui.")]
 pub struct Args {
     /// Whether the user must correct errors before moving on to the next word
     #[arg(short, long, default_value_t = false)]
