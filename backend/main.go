@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -80,6 +81,21 @@ func registerRoutes(mux *http.ServeMux) error {
 		fmt.Fprintf(w, "Ready at %v!\n", ctx.Value("serverAddr"))
 	})
 	mux.Handle("/ws", hub.Handler(&dataProvider, &nameProvider))
+	mux.HandleFunc("/new_data", func(w http.ResponseWriter, r *http.Request) {
+		data, err := dataProvider.NewData()
+
+		if err != nil {
+			return
+		}
+
+		p, err := json.Marshal(data)
+
+		if err != nil {
+			return
+		}
+
+		w.Write(p)
+	})
 
 	return nil
 }
