@@ -7,13 +7,9 @@ pub struct Args {
     #[arg(short, long, default_value_t = false)]
     pub no_error: bool,
 
-    /// How many times per second the tui is drawn.
-    #[arg(short, long, default_value_t = 30)]
-    pub fps: usize,
-
-    /// The tick per second
-    #[arg(short, long, default_value_t = 120)]
-    pub tps: usize,
+    /// Don't get quotes from the backend and only use the built-in quotes
+    #[arg(short, long)]
+    pub offline: bool,
 
     /// Custom path to database of words. See
     /// https://github.com/mingli202/typing-test-tui/blob/main/assets/english.json for shape of
@@ -26,7 +22,11 @@ pub struct Args {
     #[arg(short, long)]
     pub quotes_path: Option<String>,
 
-    /// Don't get quotes from the backend and only use the built-in quotes
-    #[arg(short, long)]
-    pub offline: bool,
+    /// How many times per second the tui is drawn. (lower fps might have better performance on lower end devices)
+    #[arg(short, long, default_value_t = 30)]
+    pub fps: usize,
+
+    /// The tick per second. (lower tps might have better performance on lower end devices)
+    #[arg(short, long, default_value_t = 120)]
+    pub tps: usize,
 }
