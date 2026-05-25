@@ -185,6 +185,9 @@ fn init_data_tx(data_tx: mpsc::Sender<Data>) {
                     if did_send.is_err() {
                         return;
                     }
+                } else {
+                    // if there's a problem, exit the task
+                    return;
                 };
             }
         }
