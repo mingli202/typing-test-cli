@@ -192,6 +192,8 @@ fn init_data_tx(data_tx: mpsc::Sender<Data>) {
                 } else {
                     n += 1;
 
+                    // if it doesn't work, then just return
+                    // the user can just use the built-in quotes
                     if n == 4 {
                         return;
                     }
