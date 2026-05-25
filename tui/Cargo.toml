@@ -3,7 +3,7 @@ name = "typing-test-tui"
 version = "1.0.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Typing speed test tui in rust"
+description = "Multiplayer typing speed test tui in rust"
 repository = "https://github.com/mingli202/typing-test-tui"
 authors = ["mingli202"]
 
