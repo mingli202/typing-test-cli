@@ -22,6 +22,18 @@ mod singleplayer;
 pub mod typing;
 mod util;
 
+pub const BACKEND_DOMAIN: &str = if cfg!(debug_assertions) {
+    "localhost:8080"
+} else {
+    "typing-test-tui-backend.onrender.com"
+};
+
+pub fn ws_url() -> String {
+    let schema = if cfg!(debug_assertions) { "ws" } else { "wss" };
+
+    format!("{}://{}/ws", schema, BACKEND_DOMAIN)
+}
+
 pub enum CustomEvent {
     Quit,
     Tick,

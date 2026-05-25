@@ -9,9 +9,9 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
 use tokio_util::sync::CancellationToken;
 
-use crate::CustomEvent;
 use crate::typing::Typing;
 use crate::util::toast::{self, ToastMessage};
+use crate::{CustomEvent, ws_url};
 
 use super::models::{LobbyInfo, NewGame, PlayersInfoSnapshot};
 use super::{GameModel, GameStatus, Lobby};
@@ -23,12 +23,7 @@ pub async fn connect_to_ws(
     event_tx: UnboundedSender<CustomEvent>,
     write_rx: UnboundedReceiver<String>,
 ) -> color_eyre::Result<()> {
-    let ws_url = if cfg!(debug_assertions) {
-        "ws://localhost:8080/ws"
-    } else {
-        "wss://typing-test-tui-backend.onrender.com/ws"
-    };
-    let request = ws_url.into_client_request()?;
+    let request = ws_url().into_client_request()?;
 
     let (stream, _) = connect_async(request).await?;
 
