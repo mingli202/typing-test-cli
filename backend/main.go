@@ -85,8 +85,7 @@ func registerRoutes(mux *http.ServeMux) error {
 		data, err := dataProvider.NewData()
 
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			http.Error(w, "failed to serialize data", http.StatusInternalServerError)
 			return
 		}
 
@@ -96,7 +95,7 @@ func registerRoutes(mux *http.ServeMux) error {
 			return
 		}
 
-		w.Write(p)
+		_, _ = w.Write(p)
 	})
 
 	return nil
