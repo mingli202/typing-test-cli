@@ -26,13 +26,18 @@ impl DataProvider {
     pub fn new(
         words_path: &Option<String>,
         quotes_path: &Option<String>,
+        only_offline: bool,
     ) -> color_eyre::Result<Self> {
         let words = get_words(words_path)?;
         let quotes = get_quotes(quotes_path)?;
 
-        let (data_tx, data_rx) = mpsc::channel(5);
+        let (data_tx, mut data_rx) = mpsc::channel(5);
 
-        init_data_tx(data_tx);
+        if only_offline {
+            data_rx.close();
+        } else {
+            init_data_tx(data_tx);
+        }
 
         Ok(DataProvider {
             words,

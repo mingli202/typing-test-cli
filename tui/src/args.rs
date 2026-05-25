@@ -25,4 +25,8 @@ pub struct Args {
     /// https://github.com/mingli202/typing-test-tui/blob/main/assets/quotes.json for shape of json
     #[arg(short, long)]
     pub quotes_path: Option<String>,
+
+    /// Don't get quotes from the backend and only use the built-in quotes
+    #[arg(short, long)]
+    pub offline: bool,
 }

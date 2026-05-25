@@ -34,7 +34,8 @@ impl AppModel {
     ) -> color_eyre::Result<Self> {
         let config = Config::new(event_tx.clone()).await;
         let toast = Toast::new(event_tx.clone());
-        let mut data_provider = DataProvider::new(&args.words_path, &args.quotes_path)?;
+        let mut data_provider =
+            DataProvider::new(&args.words_path, &args.quotes_path, args.offline)?;
 
         let initial_mode = config.data.mode.clone();
         let data = data_provider.get_data_from_mode(&initial_mode);
